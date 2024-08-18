@@ -3,17 +3,17 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 class TradingStrategy(ABC):
-    def __init__(self, config):
-        self.config = config
-        self.balance = config['initial_balance']
+    def __init__(self, config_manager):
+        self.balance = config_manager.get_initial_balance()
         self.crypto_balance = 0
-        self.trading_fee = config['exchange']['trading_fee']
-        self.take_profit = config['limits']['take_profit']
-        self.stop_loss = config['limits']['stop_loss']
+        self.trading_fee = config_manager.get_exchange()['trading_fee']
+        limits = config_manager.get_limits()
+        self.take_profit = limits['take_profit']
+        self.stop_loss = limits['stop_loss']
         self.logger = logging.getLogger(self.__class__.__name__)
         self.data = None
-        self.initial_balance = config['initial_balance']
-        self.start_balance = config['initial_balance']
+        self.initial_balance = config_manager.get_initial_balance()
+        self.start_balance = config_manager.get_initial_balance()
         self.start_crypto_balance = 0
     
     def load_data(self, data):

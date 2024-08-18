@@ -7,15 +7,23 @@ from .plotter import Plotter
 from .base import TradingStrategy
 
 class GridTradingStrategy(TradingStrategy):
-    def __init__(self, config):
-        super().__init__(config)
-        grid_params = config['grid']
-        self.base_currency = config['pair']['base_currency']
-        self.quote_currency = config['pair']['quote_currency']
+    def __init__(self, config_manager):
+        super().__init__(config_manager)
+        self.base_currency = config_manager.get_pair()['base_currency']
+        self.quote_currency = config_manager.get_pair()['quote_currency']
+        grid_params = config_manager.get_grid_settings()
         self.trigger_price = grid_params.get('trigger_price')
         self.trade_percentage = grid_params.get('trade_percentage', 0.1)  # Default to 10%
-        self.grid_manager = GridManager(grid_params['bottom_range'], grid_params['top_range'], grid_params['num_grids'], grid_params['spacing_type'], grid_params.get('percentage_spacing', 0.05))
-        self.order_manager = OrderManager(self.trade_percentage, config['exchange']['trading_fee'])
+        
+        self.grid_manager = GridManager(
+            grid_params['bottom_range'],
+            grid_params['top_range'],
+            grid_params['num_grids'],
+            grid_params['spacing_type'],
+            grid_params.get('percentage_spacing', 0.05)
+        )
+        
+        self.order_manager = OrderManager(self.trade_percentage, config_manager.get_exchange()['trading_fee'])
         self.performance_metrics = PerformanceMetrics()
         self.plotter = Plotter()
         self.logger = logging.getLogger(self.__class__.__name__)

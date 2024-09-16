@@ -4,39 +4,39 @@ from abc import ABC, abstractmethod
 
 class TradingStrategy(ABC):
     def __init__(self, config_manager):
-        self.balance = config_manager.get_initial_balance()
-        self.crypto_balance = 0
-        self.trading_fee = config_manager.get_exchange()['trading_fee']
-        limits = config_manager.get_limits()
-        self.take_profit = limits['take_profit']
-        self.stop_loss = limits['stop_loss']
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.data = None
-        self.initial_balance = config_manager.get_initial_balance()
-        self.start_balance = config_manager.get_initial_balance()
+        self.config_manager = config_manager
+        self.initial_balance, self.trading_fee, self.take_profit, self.is_take_profit_active, self.stop_loss, self.is_stop_loss_active = self.extract_base_config()
+        self.balance = self.initial_balance
+        self.crypto_balance = 0
         self.start_crypto_balance = 0
+        self.data = None
+    
+    def extract_base_config(self):
+        initial_balance = self.config_manager.get_initial_balance()
+        trading_fee = self.config_manager.get_trading_fee()
+        take_profit = self.config_manager.get_take_profit_threshold()
+        is_take_profit_active = self.config_manager.is_take_profit_active()
+        stop_loss = self.config_manager.get_stop_loss_threshold()
+        is_stop_loss_active = self.config_manager.is_stop_loss_active()
+        return initial_balance, trading_fee, take_profit, is_take_profit_active, stop_loss, is_stop_loss_active
     
     def load_data(self, data):
         self.data = data
 
     def check_take_profit_stop_loss(self, current_price):
-        if self.take_profit['is_active'] and current_price >= self.take_profit['threshold']:
+        if self.is_take_profit_active and current_price >= self.take_profit:
             self.logger.info(f"Take profit triggered at {current_price}")
             self.balance += self.crypto_balance * current_price * (1 - self.trading_fee)
             self.crypto_balance = 0
             return True
 
-        if self.stop_loss['is_active'] and current_price <= self.stop_loss['threshold']:
+        if self.is_stop_loss_active and current_price <= self.stop_loss:
             self.logger.info(f"Stop loss triggered at {current_price}")
             self.balance += self.crypto_balance * current_price * (1 - self.trading_fee)
             self.crypto_balance = 0
             return True
         return False
-
-    def calculate_roi(self):
-        total_value = self.balance + self.crypto_balance * self.data['close'].iloc[-1]
-        roi = (total_value - self.initial_balance) / self.initial_balance * 100
-        return total_value, roi
 
     def calculate_drawdown(self):
         peak = self.data['account_value'].expanding(min_periods=1).max()

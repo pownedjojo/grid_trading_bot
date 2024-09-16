@@ -1,34 +1,36 @@
-import pandas as pd
 import logging
-from .grid_manager import GridManager
-from .order_manager import OrderManager
-from .performance_metrics import PerformanceMetrics
+import pandas as pd
 from .plotter import Plotter
 from .base import TradingStrategy
+from .grid_manager import GridManager
+from order_management.order_manager import OrderManager
+from .performance_metrics import PerformanceMetrics
 
 class GridTradingStrategy(TradingStrategy):
-    def __init__(self, config_manager):
+    def __init__(self, config_manager, data_manager, grid_manager, order_manager, performance_metrics, plotter):
         super().__init__(config_manager)
-        self.base_currency = config_manager.get_pair()['base_currency']
-        self.quote_currency = config_manager.get_pair()['quote_currency']
-        grid_params = config_manager.get_grid_settings()
-        self.trigger_price = grid_params.get('trigger_price')
-        self.trade_percentage = grid_params.get('trade_percentage', 0.1)  # Default to 10%
-        
-        self.grid_manager = GridManager(
-            grid_params['bottom_range'],
-            grid_params['top_range'],
-            grid_params['num_grids'],
-            grid_params['spacing_type'],
-            grid_params.get('percentage_spacing', 0.05)
-        )
-        
-        self.order_manager = OrderManager(self.trade_percentage, config_manager.get_exchange()['trading_fee'])
-        self.performance_metrics = PerformanceMetrics()
-        self.plotter = Plotter()
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.config_manager = config_manager
+        self.data_manager = data_manager
+        self.grid_manager = grid_manager
+        self.order_manager = order_manager
+        self.performance_metrics = performance_metrics
+        self.plotter = plotter
+        pair, timeframe, start_date, end_date = self.extract_config()
+        self.initialize_strategy(pair, timeframe, start_date, end_date)
+    
+    def extract_config(self):
+        pair_config = self.config_manager.get_base_currency()
+        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
+        timeframe = self.config_manager.get_timeframe()
+        start_date = self.config_manager.get_start_date()
+        end_date = self.config_manager.get_end_date()
+        return pair, timeframe, start_date, end_date
+
+    def initialize_strategy(self, pair, timeframe, start_date, end_date):
+        self.load_data(self.data_manager.fetch_ohlcv(pair, timeframe, start_date, end_date))
         self.grids = self.grid_manager.calculate_grids()
-        self.trading_active = self.trigger_price is None
+        self.central_price = self.grid_manager.get_central_price()
         self.order_manager.initialize_grid_orders(self.grids)
         self.grid_orders = self.order_manager.grid_orders
 
@@ -43,48 +45,36 @@ class GridTradingStrategy(TradingStrategy):
             current_timestamp = self.data.index[i]
             self.logger.debug(f"Current price: {current_price}, Previous price: {previous_price}")
 
-            self.activate_trading(current_price)
+            if self.check_take_profit_stop_loss(current_price):
+                self.logger.info("Take profit or stop loss triggered, ending simulation")
+                break
 
-            if self.trading_active:
-                if self.check_take_profit_stop_loss(current_price):
-                    self.logger.info("Take profit or stop loss triggered, ending simulation")
-                    break
-
-                self.execute_orders(current_price, current_timestamp)
+            self.execute_orders(current_price, current_timestamp)
 
         final_price = self.data['close'].iloc[-1]
-        self.performance_metrics.calculate_gains(initial_price, final_price, self.start_crypto_balance, self.initial_balance, self.balance, self.crypto_balance)
+        self.performance_metrics.calculate_gains(initial_price, final_price, self.start_crypto_balance, self.balance, self.crypto_balance)
         self.data['account_value'] = self.balance + self.crypto_balance * self.data['close']
 
-    ## TODO: handle trigger_price null - if trigger_price null => trigger_price should be market price when simulation starts
-    def activate_trading(self, current_price):
-        if not self.trading_active and self.trigger_price is not None and current_price >= self.trigger_price:
-            self.trading_active = True
-            self.logger.info(f"Grid Trading activated at {current_price}")
-
     def execute_orders(self, current_price, current_timestamp):
-        if self.trigger_price is not None:
-            buy_grids = [price for price in sorted(self.grid_orders.keys()) if price <= self.trigger_price]
-            sell_grids = [price for price in sorted(self.grid_orders.keys()) if price > self.trigger_price]
+        buy_grids = [price for price in sorted(self.grid_orders.keys()) if price <= self.central_price]
+        sell_grids = [price for price in sorted(self.grid_orders.keys()) if price > self.central_price]
 
-            for price in buy_grids:
-                self.logger.info(f"Checking buy conditions at {current_timestamp}: current_price={current_price}, price={price}, trigger_price={self.trigger_price}, buy_quantity={self.grid_orders[price]['buy_quantity']}")
-                if current_price <= price and self.order_manager.can_place_buy_order(price):
-                    self.buy(price, current_timestamp)
+        for buy_grid_price in buy_grids:
+            if self.order_manager.can_place_buy_order(buy_grid_price, current_price):
+                self.buy(buy_grid_price, current_timestamp)
 
-            for price in sell_grids:
-                self.logger.info(f"Checking sell conditions at {current_timestamp}: current_price={current_price}, price={price}, trigger_price={self.trigger_price}, buy_quantity={self.grid_orders[price]['buy_quantity']}, sell_quantity={self.grid_orders[price]['sell_quantity']}")
-                if self.order_manager.can_place_sell_order(price, current_price):
-                    buy_order = self.order_manager.find_buy_order_for_sale(price)
-                    if buy_order is not None:
-                        self.sell(price, buy_order, current_timestamp)
-                        self.logger.info(f"Sell order placed at {price} for timestamp {current_timestamp}")
-                    else:
-                        self.logger.info(f"No corresponding buy order found for sell order at price {price}")
+        for sell_grid_price in sell_grids:
+            if self.order_manager.can_place_sell_order(sell_grid_price, current_price):
+                buy_order = self.order_manager.find_buy_order_for_sale(sell_grid_price)
+                if buy_order is not None:
+                    self.sell(sell_grid_price, buy_order, current_timestamp)
+                    self.logger.info(f"Sell order placed at {sell_grid_price} for timestamp {current_timestamp}")
+                else:
+                    self.logger.info(f"No corresponding buy order found for sell order at price {sell_grid_price}")
 
     def buy(self, price, timestamp):
         self.balance, self.crypto_balance = self.order_manager.place_buy_order(price, timestamp, self.balance, self.crypto_balance)
-        self.logger.info(f"Placing buy order at {price} on {timestamp}. Quantity: {self.order_manager.grid_orders[price]['buy_quantity']}, Updated balance: {self.balance}, crypto balance: {self.crypto_balance}")
+        self.logger.info(f"Placing buy order at {price} on {timestamp}. Updated balance: {self.balance}, crypto balance: {self.crypto_balance}")
 
     def sell(self, price, buy_order, timestamp):
         self.balance, self.crypto_balance = self.order_manager.place_sell_order(price, buy_order, timestamp, self.balance, self.crypto_balance)
@@ -92,7 +82,7 @@ class GridTradingStrategy(TradingStrategy):
 
     def calculate_performance_metrics(self):
         final_balance = self.balance + self.crypto_balance * self.data['close'].iloc[-1]
-        final_balance, roi = self.performance_metrics.calculate_roi(self.initial_balance, final_balance)
+        roi = self.performance_metrics.calculate_roi(final_balance)
         max_drawdown = round(self.calculate_drawdown(), 2)
         max_runup = round(self.calculate_runup(), 2)
         time_in_profit = round(self.calculate_time_in_profit_loss()[0], 2)
@@ -101,11 +91,8 @@ class GridTradingStrategy(TradingStrategy):
         sortino_ratio = self.calculate_sortino_ratio()
         num_buy_trades = len(self.order_manager.buy_orders)
         num_sell_trades = len(self.order_manager.sell_orders)
-
-        performance_summary = self.performance_metrics.generate_performance_summary(
-            self.data, self.initial_balance, self.crypto_balance, self.data['close'].iloc[-1], roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio, self.base_currency, self.quote_currency
-        )
+        performance_summary = self.performance_metrics.generate_performance_summary(self.data, self.crypto_balance, self.data['close'].iloc[-1], roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio)
         return performance_summary
 
     def plot_results(self):
-        self.plotter.plot_results(self.data, self.grids, self.order_manager.buy_orders, self.order_manager.sell_orders, self.trigger_price)
+        self.plotter.plot_results(self.data, self.grids, self.order_manager.buy_orders, self.order_manager.sell_orders)

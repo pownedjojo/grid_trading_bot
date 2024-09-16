@@ -1,23 +1,31 @@
 import pandas as pd
 
 class PerformanceMetrics:
-    def __init__(self):
+    def __init__(self, config_manager):
+        self.config_manager = config_manager
+        self.initial_balance, self.base_currency, self.quote_currency = self.extract_config()
         self.appreciation_gains = 0
         self.grid_trading_gains = 0
+    
+    def extract_config(self):
+        initial_balance = self.config_manager.get_initial_balance()
+        base_currency = self.config_manager.get_base_currency()
+        quote_currency = self.config_manager.get_quote_currency()
+        return initial_balance, base_currency, quote_currency
 
-    def calculate_gains(self, initial_price, final_price, start_crypto_balance, initial_balance, balance, crypto_balance):
-        total_initial_crypto_value = initial_balance / initial_price
+    def calculate_gains(self, initial_price, final_price, start_crypto_balance, balance, crypto_balance):
+        total_initial_crypto_value = self.initial_balance / initial_price
         self.appreciation_gains = (final_price - initial_price) * total_initial_crypto_value
-        self.grid_trading_gains = (balance + crypto_balance * final_price) - initial_balance - self.appreciation_gains
+        self.grid_trading_gains = (balance + crypto_balance * final_price) - self.initial_balance - self.appreciation_gains
         return self.appreciation_gains, self.grid_trading_gains
 
-    def calculate_roi(self, initial_balance, final_balance):
-        roi = (final_balance - initial_balance) / initial_balance * 100
-        return final_balance, round(roi, 2)
+    def calculate_roi(self, final_balance):
+        roi = (final_balance - self.initial_balance) / self.initial_balance * 100
+        return round(roi, 2)
     
-    def generate_performance_summary(self, data, initial_balance, crypto_balance, final_price, roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio, base_currency, quote_currency):
-        pair = f"{base_currency}/{quote_currency}"
-        final_balance = initial_balance + crypto_balance * final_price
+    def generate_performance_summary(self, data, crypto_balance, final_price, roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio):
+        pair = f"{self.base_currency}/{self.quote_currency}"
+        final_balance = self.initial_balance + crypto_balance * final_price
         start_date = data.index[0]
         end_date = data.index[-1]
         duration = end_date - start_date

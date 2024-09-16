@@ -1,12 +1,13 @@
 import plotly.graph_objects as go
 
 class Plotter:
-    def __init__(self):
-        pass
+    def __init__(self, config_manager, grid_manager):
+        self.config_manager = config_manager
+        self.grid_manager = grid_manager
 
-    def plot_results(self, data, grids, buy_orders, sell_orders, trigger_price):
+    def plot_results(self, data, grids, buy_orders, sell_orders):
         fig = self.create_base_figure(data)
-        self.add_grid_lines(fig, grids, trigger_price)
+        self.add_grid_lines(fig, grids)
         self.add_orders(fig, buy_orders, sell_orders)
         self.finalize_figure(fig)
         fig.show()
@@ -16,11 +17,12 @@ class Plotter:
         fig.add_trace(go.Scatter(x=data.index, y=data['close'], mode='lines', name='Close Price', showlegend=False))
         return fig
 
-    def add_grid_lines(self, fig, grids, trigger_price):
+    def add_grid_lines(self, fig, grids):
+        central_price = self.grid_manager.get_central_price()
         for price in grids:
-            if price < trigger_price:
+            if price < central_price:
                 self.add_grid_line(fig, price, 'green')
-            elif price > trigger_price:
+            elif price > central_price:
                 self.add_grid_line(fig, price, 'red')
 
     def add_grid_line(self, fig, price, color):

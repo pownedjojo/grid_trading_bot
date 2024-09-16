@@ -15,9 +15,13 @@ Open-source Grid Trading Bot implemented in Python, allowing you to backtest and
 
 ## What is Grid Trading?
 
-Grid trading is a type of trading strategy that involves placing buy and sell orders at predefined intervals above and below a set price. The goal is to capitalize on normal price volatility in the market, buying low and selling high.
+Grid trading is a trading strategy that places buy and sell orders at predefined intervals above and below a set price. The goal is to capitalize on market volatility by buying low and selling high at different price points. There are two primary types of grid trading: **arithmetic** and **geometric**.
 
-### Simple Example
+### **Arithmetic Grid Trading**
+
+In an arithmetic grid, the grid levels (price intervals) are spaced **equally**. The distance between each buy and sell order is constant, providing a more straightforward strategy for fluctuating markets.
+
+#### **Simple Example**
 
 Suppose the price of a cryptocurrency is $3000, and you set up a grid with the following parameters:
 
@@ -25,7 +29,26 @@ Suppose the price of a cryptocurrency is $3000, and you set up a grid with the f
 - **Buy orders**: Set at $2900 and $2950
 - **Sell orders**: Set at $3050 and $3100
 
-As the price fluctuates, the bot will automatically execute buy orders as the price decreases and sell orders as the price increases, allowing you to profit from market swings.
+As the price fluctuates, the bot will automatically execute buy orders as the price decreases and sell orders as the price increases. This method profits from small, predictable price fluctuations, as the intervals between buy/sell orders are consistent (in this case, $50).
+
+### **Geometric Grid Trading**
+
+In a geometric grid, the grid levels are spaced **proportionally** or by a percentage. The intervals between price levels increase or decrease exponentially based on a set percentage, making this grid type more suited for assets with higher volatility.
+
+#### **Simple Example**
+
+Suppose the price of a cryptocurrency is $3000, and you set up a geometric grid with a 5% spacing between levels. The price intervals will not be equally spaced but will grow or shrink based on the percentage.
+
+- **Grid levels**: $2700, $2835, $2975, $3125, $3280
+- **Buy orders**: Set at $2700 and $2835
+- **Sell orders**: Set at $3125 and $3280
+
+As the price fluctuates, buy orders are executed at lower levels and sell orders at higher levels, but the grid is proportional. This strategy is better for markets that experience exponential price movements.
+
+### **When to Use Each Type?**
+
+- **Arithmetic grids** are ideal for assets with more stable, linear price fluctuations.
+- **Geometric grids** are better for assets with significant, unpredictable volatility, as they adapt more flexibly to market swings.
 
 ## Installation
 
@@ -36,20 +59,20 @@ Ensure you have [Conda](https://docs.conda.io/projects/conda/en/latest/user-guid
 ### Setting Up the Environment
 
 1. **Clone the repository**:
-   ```sh
-   git clone https://github.com/yourusername/grid_trading_bot.git
-   cd grid_trading_bot
-   ```
+  ```sh
+  git clone https://github.com/yourusername/grid_trading_bot.git
+  cd grid_trading_bot
+  ```
 
 2.  **Create the Conda environment**:
-```sh
-    conda env create -f environment.yml
-```
+  ```sh
+  conda env create -f environment.yml
+  ```
 
 3.	**Activate the environment**: 
-```sh
-    conda activate grid_trading_bot
-```
+  ```sh
+  conda activate grid_trading_bot
+  ```
 
 ### Configuration
 
@@ -85,8 +108,7 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
     "bottom_range": 3200,
     "spacing_type": "arithmetic",
     "grid_spacing": 200,
-    "percentage_spacing": 0.05,
-    "trigger_price": null
+    "percentage_spacing": 0.05
   },
   "limits": {
     "max_orders": 10
@@ -117,7 +139,6 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
   - **spacing_type**: The type of spacing (arithmetic or geometric).
   - **grid_spacing**: The spacing between grids (used for arithmetic spacing).
   - **percentage_spacing**: The percentage spacing between grids (used for geometric spacing).
-  - **trigger_price**: The price at which to start trading.
 - **limits**: Configurations for risk management.
   - **take_profit**: Settings for taking profit.
     - **is_active**: Whether the take profit is active.
@@ -132,7 +153,7 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
 
 To run the bot, use the following command:
 ```sh 
-    grid_trading_bot --config config/config.json
+  grid_trading_bot --config config/config.json
 ```
 
 ## Contributing

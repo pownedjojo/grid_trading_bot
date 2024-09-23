@@ -4,6 +4,7 @@ from .plotter import Plotter
 from .base import TradingStrategy
 from .grid_manager import GridManager
 from order_management.order_manager import OrderManager
+from order_management.order import Order, OrderType
 from .performance_metrics import PerformanceMetrics
 
 class GridTradingStrategy(TradingStrategy):
@@ -32,42 +33,38 @@ class GridTradingStrategy(TradingStrategy):
         self.grids = self.grid_manager.calculate_grids()
         self.central_price = self.grid_manager.get_central_price()
         self.order_manager.initialize_grid_levels(self.grids, self.central_price)
+        self.start_crypto_balance = self.crypto_balance
 
     def simulate(self):
         self.logger.info("Start trading simulation")
-        close_prices = self.data['close'].values
-        timestamps = self.data.index
-        initial_price = close_prices[0]
-        self.start_crypto_balance = self.crypto_balance
+        self.extract_price_and_timestamps()
     
-        for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(close_prices), timestamps[1:]):
+        for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), self.timestamps[1:]):
             if self.check_take_profit_stop_loss(current_price):
                 self.logger.info("Take profit or stop loss triggered, ending simulation")
                 break
             self.execute_orders(current_price, previous_price, current_timestamp)
-
-        final_price = close_prices[-1]
-        self.performance_metrics.calculate_gains(initial_price, final_price, self.start_crypto_balance, self.balance, self.crypto_balance)
-        self.data['account_value'] = self.balance + self.crypto_balance * close_prices
-
-    def execute_orders(self, current_price, previous_price, current_timestamp):
-        try:
-            self.attempt_buy_order(current_price, previous_price, current_timestamp)
-        except ValueError as e:
-            self.logger.error(f"Error placing buy order: {e}")
-
-        try:
-            self.attempt_sell_order(current_price, previous_price, current_timestamp)
-        except ValueError as e:
-            self.logger.error(f"Error placing sell order: {e}")
+        self.finalize_simulation()
     
-    def attempt_buy_order(self, current_price, previous_price, timestamp):
-        if self.order_manager.can_execute_buy_order(current_price, timestamp):
-            self.balance, self.crypto_balance = self.order_manager.execute_buy(current_price, previous_price, timestamp, self.balance, self.crypto_balance)
+    def extract_price_and_timestamps(self):
+        self.close_prices = self.data['close'].values
+        self.timestamps = self.data.index
+        self.initial_price = self.close_prices[0]
+    
+    def execute_orders(self, current_price, previous_price, current_timestamp):
+        self.handle_order_execution(current_price, previous_price, current_timestamp, OrderType.BUY)
+        self.handle_order_execution(current_price, previous_price, current_timestamp, OrderType.SELL)
+    
+    def handle_order_execution(self, current_price, previous_price, timestamp, order_type: OrderType):
+        try:
+            self.balance, self.crypto_balance = self.order_manager.execute_order(order_type, current_price, previous_price, timestamp, self.balance, self.crypto_balance)
+        except ValueError as e:
+            self.logger.error(f"Error placing {order_type} order: {e}")
 
-    def attempt_sell_order(self, current_price, previous_price, timestamp):
-        if self.order_manager.can_execute_sell_order(current_price, timestamp):
-            self.balance, self.crypto_balance = self.order_manager.execute_sell(current_price, previous_price, timestamp, self.balance, self.crypto_balance)
+    def finalize_simulation(self):
+        final_price = self.close_prices[-1]
+        self.performance_metrics.calculate_gains(self.initial_price, final_price, self.start_crypto_balance, self.balance, self.crypto_balance)
+        self.data['account_value'] = self.balance + self.crypto_balance * self.close_prices
 
     def calculate_performance_metrics(self):
         final_balance = self.balance + self.crypto_balance * self.data['close'].iloc[-1]
@@ -78,10 +75,16 @@ class GridTradingStrategy(TradingStrategy):
         time_in_loss = round(self.calculate_time_in_profit_loss()[1], 2)
         sharpe_ratio = self.calculate_sharpe_ratio()
         sortino_ratio = self.calculate_sortino_ratio()
-        num_buy_trades = len(self.order_manager.buy_orders)
-        num_sell_trades = len(self.order_manager.sell_orders)
-        performance_summary = self.performance_metrics.generate_performance_summary(self.data, final_balance, self.data['close'].iloc[-1], roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio)
+        total_buy_trades = 0
+        total_sell_trades = 0
+
+        for grid_level in self.order_manager.grid_levels.values():
+            total_buy_trades += len(grid_level.buy_orders)
+            total_sell_trades += len(grid_level.sell_orders)
+
+        performance_summary = self.performance_metrics.generate_performance_summary(self.data, final_balance, self.data['close'].iloc[-1], roi, max_drawdown, max_runup, time_in_profit, time_in_loss, total_buy_trades, total_sell_trades, sharpe_ratio, sortino_ratio)
         return performance_summary
 
     def plot_results(self):
-        self.plotter.plot_results(self.data, self.grids, self.order_manager.buy_orders, self.order_manager.sell_orders)
+        print("USE grid levels to get buy and sell orders ? -> inject order_manager in Plotter class directly ?")
+        # self.plotter.plot_results(self.data, self.grids, self.order_manager.buy_orders, self.order_manager.sell_orders)

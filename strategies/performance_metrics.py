@@ -23,9 +23,8 @@ class PerformanceMetrics:
         roi = (final_balance - self.initial_balance) / self.initial_balance * 100
         return round(roi, 2)
     
-    def generate_performance_summary(self, data, crypto_balance, final_price, roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio):
+    def generate_performance_summary(self, data, final_balance, final_price, roi, max_drawdown, max_runup, time_in_profit, time_in_loss, num_buy_trades, num_sell_trades, sharpe_ratio, sortino_ratio):
         pair = f"{self.base_currency}/{self.quote_currency}"
-        final_balance = self.initial_balance + crypto_balance * final_price
         start_date = data.index[0]
         end_date = data.index[-1]
         duration = end_date - start_date

@@ -20,7 +20,6 @@ class GridTradingBot:
         try:
             self.config_manager = self.initialize_config_manager()
             setup_logging(self.config_manager.get_logging_level())
-            
             self.logger.info("Starting Grid Trading Bot")
 
             self.data_manager = DataManager(self.config_manager)
@@ -33,6 +32,7 @@ class GridTradingBot:
             strategy.simulate()
             strategy.plot_results()
             performance_summary = strategy.calculate_performance_metrics()
+            self.order_manager.display_orders()
 
         except (ConfigFileNotFoundError, ConfigParseError, ConfigValidationError) as e:
             self.handle_config_error(e)
@@ -55,9 +55,6 @@ class GridTradingBot:
         self.logger.error(f"An unexpected error occurred: {exception}")
         self.logger.error(traceback.format_exc())
         exit(1)
-
-def setup_logging(log_level):
-    logging.basicConfig(level=log_level)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backtest Spot Grid Trading Strategy.")

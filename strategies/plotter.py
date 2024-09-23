@@ -36,18 +36,26 @@ class Plotter:
 
     def add_orders(self, fig, buy_orders, sell_orders):
         for order in buy_orders:
-            self.add_order(fig, order, 'triangle-up', 'green')
-        for order in sell_orders:
-            self.add_order(fig, order, 'triangle-down', 'red')
+            fig.add_trace(go.Scatter(
+                x=[order.timestamp],
+                y=[order.price],
+                mode='markers',
+                marker=dict(symbol='triangle-up', color='green', size=10),
+                name='Buy Order',
+                text=f"Buy\nPrice: {order.price}\nQty: {order.quantity}\nDate: {order.timestamp}",
+                hoverinfo='text'
+            ))
 
-    def add_order(self, fig, order, symbol, color):
-        fig.add_trace(go.Scatter(
-            x=[order['timestamp']],
-            y=[order['price']],
-            mode='markers',
-            marker=dict(symbol=symbol, color=color, size=10),
-            showlegend=False
-        ))
+        for order in sell_orders:
+            fig.add_trace(go.Scatter(
+                x=[order.timestamp],
+                y=[order.price],
+                mode='markers',
+                marker=dict(symbol='triangle-down', color='red', size=10),
+                name='Sell Order',
+                text=f"Sell\nPrice: {order.price}\nQty: {order.quantity}\nDate: {order.timestamp}",
+                hoverinfo='text'
+            ))
 
     def finalize_figure(self, fig):
-        fig.update_layout(title='Grid Trading Backtesting', xaxis_title='Date', yaxis_title='Price (USDT)', showlegend=False)
+        fig.update_layout(title='Grid Trading Strategy Results', xaxis_title='Time', yaxis_title='Price (USDT)', showlegend=False)

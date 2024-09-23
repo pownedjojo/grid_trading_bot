@@ -31,3 +31,9 @@ class Order:
 
     def is_completed(self):
         return self.state == OrderState.COMPLETED
+    
+    def __str__(self):
+        return f"Order({self.order_type}, price={self.price}, quantity={self.quantity}, timestamp={self.timestamp}, state={self.state})"
+
+    def __repr__(self):
+        return self.__str__()

@@ -42,9 +42,13 @@ class DataManager:
         return df
     
     def _get_candle_limit(self):
-        # if self.exchange_name == 'binance':
-        #     return 1000
-        return 1000
+        candle_limits = {
+            'binance': 1000,
+            'coinbase': 300,
+            'kraken': 720,
+            'bitfinex': 5000
+        }
+        return candle_limits.get(self.exchange_name, 500) # Default to 500 if not found
 
     def _get_timeframe_in_ms(self, timeframe):
         timeframe_mappings = {

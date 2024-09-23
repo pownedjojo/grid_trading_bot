@@ -25,17 +25,21 @@ class TradingStrategy(ABC):
         self.data = data
 
     def check_take_profit_stop_loss(self, current_price):
-        if self.is_take_profit_active and current_price >= self.take_profit:
-            self.logger.info(f"Take profit triggered at {current_price}")
-            self.balance += self.crypto_balance * current_price * (1 - self.trading_fee)
+        if self.crypto_balance == 0:
+            return False
+
+        def trigger_event(event_name, trigger_price):
+            self.logger.info(f"{event_name} triggered at {trigger_price}")
+            self.balance += self.crypto_balance * trigger_price * (1 - self.trading_fee)
             self.crypto_balance = 0
             return True
 
+        if self.is_take_profit_active and current_price >= self.take_profit:
+            return trigger_event("Take profit", self.take_profit)
+
         if self.is_stop_loss_active and current_price <= self.stop_loss:
-            self.logger.info(f"Stop loss triggered at {current_price}")
-            self.balance += self.crypto_balance * current_price * (1 - self.trading_fee)
-            self.crypto_balance = 0
-            return True
+            return trigger_event("Stop loss", self.stop_loss)
+
         return False
 
     def calculate_drawdown(self):

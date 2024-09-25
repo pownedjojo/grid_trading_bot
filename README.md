@@ -123,7 +123,7 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
 
 - **exchange**: Defines the exchange and trading fee to be used.
   - **name**: The name of the exchange (e.g., binance).
-  - **trading_fee**: The trading fee percentage.
+  - **trading_fee**: The trading fee should be in decimal format (e.g., 0.001 for 0.1%)
 - **pair**: Specifies the trading pair.
   - **base_currency**: The base currency (e.g., ETH).
   - **quote_currency**: The quote currency (e.g., USDT).

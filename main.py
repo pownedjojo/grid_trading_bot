@@ -4,7 +4,7 @@ from strategies.grid import GridTradingStrategy
 from order_management.order_manager import OrderManager
 from strategies.plotter import Plotter
 from strategies.grid_manager import GridManager
-from strategies.performance_metrics import PerformanceMetrics
+from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from config.logging_config import setup_logging
 from config.config_manager import ConfigManager
 from config.exceptions import ConfigFileNotFoundError, ConfigParseError, ConfigValidationError
@@ -25,14 +25,13 @@ class GridTradingBot:
             self.data_manager = DataManager(self.config_manager)
             self.grid_manager = GridManager(self.config_manager)
             self.order_manager = OrderManager(self.config_manager)
-            self.performance_metrics = PerformanceMetrics(self.config_manager)
-            self.plotter = Plotter(self.config_manager, self.grid_manager)
+            self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_manager)
+            self.plotter = Plotter(self.config_manager, self.grid_manager, self.order_manager)
 
-            strategy = GridTradingStrategy(self.config_manager, self.data_manager, self.grid_manager, self.order_manager, self.performance_metrics, self.plotter)
+            strategy = GridTradingStrategy(self.config_manager, self.data_manager, self.grid_manager, self.order_manager, self.trading_performance_analyzer, self.plotter)
             strategy.simulate()
             strategy.plot_results()
-            performance_summary = strategy.calculate_performance_metrics()
-            self.order_manager.display_orders()
+            performance_summary = strategy.generate_performance_report()
 
         except (ConfigFileNotFoundError, ConfigParseError, ConfigValidationError) as e:
             self.handle_config_error(e)

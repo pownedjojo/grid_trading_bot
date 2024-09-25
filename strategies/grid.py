@@ -5,17 +5,17 @@ from .base import TradingStrategy
 from .grid_manager import GridManager
 from order_management.order_manager import OrderManager
 from order_management.order import Order, OrderType
-from .performance_metrics import PerformanceMetrics
+from .trading_performance_analyzer import TradingPerformanceAnalyzer
 
 class GridTradingStrategy(TradingStrategy):
-    def __init__(self, config_manager, data_manager, grid_manager, order_manager, performance_metrics, plotter):
+    def __init__(self, config_manager, data_manager, grid_manager, order_manager, trading_performance_analyzer, plotter):
         super().__init__(config_manager)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config_manager = config_manager
         self.data_manager = data_manager
         self.grid_manager = grid_manager
         self.order_manager = order_manager
-        self.performance_metrics = performance_metrics
+        self.trading_performance_analyzer = trading_performance_analyzer
         self.plotter = plotter
         pair, timeframe, start_date, end_date = self.extract_config()
         self.initialize_strategy(pair, timeframe, start_date, end_date)
@@ -62,29 +62,11 @@ class GridTradingStrategy(TradingStrategy):
             self.logger.error(f"Error placing {order_type} order: {e}")
 
     def finalize_simulation(self):
-        final_price = self.close_prices[-1]
-        self.performance_metrics.calculate_gains(self.initial_price, final_price, self.start_crypto_balance, self.balance, self.crypto_balance)
+        self.final_price = self.close_prices[-1]
         self.data['account_value'] = self.balance + self.crypto_balance * self.close_prices
 
-    def calculate_performance_metrics(self):
-        final_balance = self.balance + self.crypto_balance * self.data['close'].iloc[-1]
-        roi = self.performance_metrics.calculate_roi(final_balance)
-        max_drawdown = round(self.calculate_drawdown(), 2)
-        max_runup = round(self.calculate_runup(), 2)
-        time_in_profit = round(self.calculate_time_in_profit_loss()[0], 2)
-        time_in_loss = round(self.calculate_time_in_profit_loss()[1], 2)
-        sharpe_ratio = self.calculate_sharpe_ratio()
-        sortino_ratio = self.calculate_sortino_ratio()
-        total_buy_trades = 0
-        total_sell_trades = 0
-
-        for grid_level in self.order_manager.grid_levels.values():
-            total_buy_trades += len(grid_level.buy_orders)
-            total_sell_trades += len(grid_level.sell_orders)
-
-        performance_summary = self.performance_metrics.generate_performance_summary(self.data, final_balance, self.data['close'].iloc[-1], roi, max_drawdown, max_runup, time_in_profit, time_in_loss, total_buy_trades, total_sell_trades, sharpe_ratio, sortino_ratio)
-        return performance_summary
+    def generate_performance_report(self):
+        self.trading_performance_analyzer.generate_performance_summary(self.data, self.balance, self.crypto_balance, self.final_price)
 
     def plot_results(self):
-        print("USE grid levels to get buy and sell orders ? -> inject order_manager in Plotter class directly ?")
-        # self.plotter.plot_results(self.data, self.grids, self.order_manager.buy_orders, self.order_manager.sell_orders)
+        self.plotter.plot_results(self.data, self.grids)

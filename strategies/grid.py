@@ -1,5 +1,4 @@
 import logging, itertools
-import pandas as pd
 import numpy as np
 from .plotter import Plotter
 from .base import TradingStrategy
@@ -30,9 +29,7 @@ class GridTradingStrategy(TradingStrategy):
 
     def _initialize_strategy(self, pair, timeframe, start_date, end_date):
         self.load_data(self.data_manager.fetch_ohlcv(pair, timeframe, start_date, end_date))
-        self.grids = self.grid_manager.calculate_grids()
-        self.central_price = self.grid_manager.get_central_price()
-        self.order_manager.initialize_grid_levels(self.grids, self.central_price)
+        self.order_manager.initialize_grid_levels()
         self.start_crypto_balance = self.crypto_balance
 
     def simulate(self):
@@ -47,14 +44,13 @@ class GridTradingStrategy(TradingStrategy):
                 break
             self._execute_orders(current_price, previous_price, current_timestamp)
             self.data['account_value'].loc[current_timestamp] = self.balance + self.crypto_balance * current_price
-        #self.data.at[self.timestamps[-1], 'account_value'] = self.balance + self.crypto_balance * self.final_price
 
     def generate_performance_report(self):
         final_price = self.close_prices[-1]
         self.trading_performance_analyzer.generate_performance_summary(self.data, self.balance, self.crypto_balance, final_price)
 
     def plot_results(self):
-        self.plotter.plot_results(self.data, self.grids)
+        self.plotter.plot_results(self.data)
     
     def _execute_orders(self, current_price, previous_price, current_timestamp):
         self._handle_order_execution(current_price, previous_price, current_timestamp, OrderType.BUY)

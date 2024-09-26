@@ -2,6 +2,8 @@ import argparse, logging, traceback
 from data.data_manager import DataManager
 from strategies.grid import GridTradingStrategy
 from order_management.order_manager import OrderManager
+from order_management.transaction_validator import TransactionValidator
+from order_management.fee_calculator import FeeCalculator
 from strategies.plotter import Plotter
 from strategies.grid_manager import GridManager
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
@@ -24,20 +26,18 @@ class GridTradingBot:
 
             self.data_manager = DataManager(self.config_manager)
             self.grid_manager = GridManager(self.config_manager)
-            self.order_manager = OrderManager(self.config_manager)
+            self.transaction_validator = TransactionValidator()
+            self.fee_calculator = FeeCalculator(self.config_manager)
+            self.order_manager = OrderManager(self.config_manager, self.grid_manager, self.transaction_validator, self.fee_calculator)
             self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_manager)
             self.plotter = Plotter(self.config_manager, self.grid_manager, self.order_manager)
-
             strategy = GridTradingStrategy(self.config_manager, self.data_manager, self.grid_manager, self.order_manager, self.trading_performance_analyzer, self.plotter)
             strategy.simulate()
             strategy.plot_results()
             performance_summary = strategy.generate_performance_report()
-
         except (ConfigFileNotFoundError, ConfigParseError, ConfigValidationError) as e:
             self.handle_config_error(e)
-
         except Exception as e:
-            # TODO: Handle OrderExecutionError, DataFetching error, etc..
             self.handle_general_error(e)
 
     def initialize_config_manager(self):

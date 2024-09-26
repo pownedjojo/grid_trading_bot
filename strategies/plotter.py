@@ -6,9 +6,10 @@ class Plotter:
         self.grid_manager = grid_manager
         self.order_manager = order_manager
 
-    def plot_results(self, data, grids):
+    def plot_results(self, data):
         fig = self.create_base_figure(data)
-        self.add_grid_lines(fig, grids)
+        grids, central_price = self.grid_manager.grids, self.grid_manager.central_price
+        self.add_grid_lines(fig, grids, central_price)
         buy_orders, sell_orders = self.order_manager.get_orders()
         self.add_orders(fig, buy_orders, sell_orders)
         self.finalize_figure(fig)
@@ -19,8 +20,7 @@ class Plotter:
         fig.add_trace(go.Scatter(x=data.index, y=data['close'], mode='lines', name='Close Price', showlegend=False))
         return fig
 
-    def add_grid_lines(self, fig, grids):
-        central_price = self.grid_manager.get_central_price()
+    def add_grid_lines(self, fig, grids, central_price):
         for price in grids:
             if price < central_price:
                 self.add_grid_line(fig, price, 'green')

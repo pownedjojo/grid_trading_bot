@@ -5,13 +5,13 @@ class TradingStrategy(ABC):
     def __init__(self, config_manager):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config_manager = config_manager
-        self.initial_balance, self.trading_fee, self.take_profit, self.is_take_profit_active, self.stop_loss, self.is_stop_loss_active = self.extract_base_config()
+        self.initial_balance, self.trading_fee, self.take_profit, self.is_take_profit_active, self.stop_loss, self.is_stop_loss_active = self._extract_base_config()
         self.balance = self.initial_balance
         self.crypto_balance = 0
         self.start_crypto_balance = 0
         self.data = None
     
-    def extract_base_config(self):
+    def _extract_base_config(self):
         initial_balance = self.config_manager.get_initial_balance()
         trading_fee = self.config_manager.get_trading_fee()
         take_profit = self.config_manager.get_take_profit_threshold()

@@ -14,16 +14,10 @@ class GridLevel:
         self.cycle_state = cycle_state
     
     def place_buy_order(self, buy_order):
-        if not self.can_place_buy_order():
-            raise ValueError(f"Cannot place buy order. Current state: {self.cycle_state}")
-
         self.buy_orders.append(buy_order)
         self.cycle_state = GridCycleState.READY_TO_SELL
 
     def place_sell_order(self, sell_order):
-        if not self.can_place_sell_order():
-            raise ValueError(f"Cannot place sell order. Current state: {self.cycle_state}")
-
         self.sell_orders.append(sell_order)
     
     def can_place_buy_order(self):

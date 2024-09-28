@@ -8,13 +8,14 @@ from order_management.order import Order, OrderType
 from .trading_performance_analyzer import TradingPerformanceAnalyzer
 
 class GridTradingStrategy(TradingStrategy):
-    def __init__(self, config_manager, data_manager, grid_manager, order_manager, trading_performance_analyzer, plotter):
+    def __init__(self, config_manager, data_manager, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter):
         super().__init__(config_manager)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config_manager = config_manager
         self.data_manager = data_manager
         self.grid_manager = grid_manager
         self.order_manager = order_manager
+        self.balance_tracker = balance_tracker
         self.trading_performance_analyzer = trading_performance_analyzer
         self.plotter = plotter
         pair, timeframe, start_date, end_date = self._extract_config()
@@ -30,7 +31,7 @@ class GridTradingStrategy(TradingStrategy):
     def _initialize_strategy(self, pair, timeframe, start_date, end_date):
         self.load_data(self.data_manager.fetch_ohlcv(pair, timeframe, start_date, end_date))
         self.order_manager.initialize_grid_levels()
-        self.start_crypto_balance = self.crypto_balance
+        self.start_crypto_balance = self.balance_tracker.crypto_balance
 
     def simulate(self):
         self.logger.info("Start trading simulation")
@@ -43,11 +44,16 @@ class GridTradingStrategy(TradingStrategy):
                 self.logger.info("Take profit or stop loss triggered, ending simulation")
                 break
             self._execute_orders(current_price, previous_price, current_timestamp)
-            self.data['account_value'].loc[current_timestamp] = self.balance + self.crypto_balance * current_price
+            self.data['account_value'].loc[current_timestamp] = self.balance_tracker.balance + self.balance_tracker.crypto_balance * current_price
 
     def generate_performance_report(self):
         final_price = self.close_prices[-1]
-        self.trading_performance_analyzer.generate_performance_summary(self.data, self.balance, self.crypto_balance, final_price)
+        self.trading_performance_analyzer.generate_performance_summary(
+            self.data, 
+            self.balance_tracker.balance, 
+            self.balance_tracker.crypto_balance, 
+            final_price
+        )
 
     def plot_results(self):
         self.plotter.plot_results(self.data)
@@ -58,6 +64,6 @@ class GridTradingStrategy(TradingStrategy):
     
     def _handle_order_execution(self, current_price, previous_price, timestamp, order_type: OrderType):
         try:
-            self.balance, self.crypto_balance = self.order_manager.execute_order(order_type, current_price, previous_price, timestamp, self.balance, self.crypto_balance)
+            self.order_manager.execute_order(order_type, current_price, previous_price, timestamp)
         except ValueError as e:
             self.logger.error(f"Error placing {order_type} order: {e}")

@@ -4,6 +4,7 @@ from strategies.grid import GridTradingStrategy
 from order_management.order_manager import OrderManager
 from order_management.transaction_validator import TransactionValidator
 from order_management.fee_calculator import FeeCalculator
+from order_management.balance_tracker import BalanceTracker
 from strategies.plotter import Plotter
 from strategies.grid_manager import GridManager
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
@@ -28,10 +29,19 @@ class GridTradingBot:
             self.grid_manager = GridManager(self.config_manager)
             self.transaction_validator = TransactionValidator()
             self.fee_calculator = FeeCalculator(self.config_manager)
-            self.order_manager = OrderManager(self.config_manager, self.grid_manager, self.transaction_validator, self.fee_calculator)
+            self.balance_tracker = BalanceTracker(self.config_manager.get_initial_balance(), 0)
+            self.order_manager = OrderManager(self.config_manager, self.grid_manager, self.transaction_validator, self.fee_calculator, self.balance_tracker)
             self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_manager)
             self.plotter = Plotter(self.config_manager, self.grid_manager, self.order_manager)
-            strategy = GridTradingStrategy(self.config_manager, self.data_manager, self.grid_manager, self.order_manager, self.trading_performance_analyzer, self.plotter)
+            strategy = GridTradingStrategy(
+                self.config_manager, 
+                self.data_manager, 
+                self.grid_manager, 
+                self.order_manager, 
+                self.balance_tracker, 
+                self.trading_performance_analyzer, 
+                self.plotter
+            )
             strategy.simulate()
             strategy.plot_results()
             performance_summary = strategy.generate_performance_report()

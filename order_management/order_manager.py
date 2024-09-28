@@ -1,8 +1,8 @@
 import logging
 from .order import Order, OrderType
+from .balance_tracker import BalanceTracker
 from .grid_level import GridLevel, GridCycleState
 from .exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
-from .balance_tracker import BalanceTracker
 
 class OrderManager:
     def __init__(self, config_manager, grid_manager, transaction_validator, fee_calculator, balance_tracker):
@@ -13,7 +13,7 @@ class OrderManager:
         self.fee_calculator = fee_calculator
         self.balance_tracker = balance_tracker
         self.grid_levels = {}
-        self.trade_percentage = 0.1 # TODO: Make use of: self.config_manager.get_trade_percentage
+        self.trade_percentage = self.config_manager.get_trade_percentage()
 
     def initialize_grid_levels(self):
         grids, central_price = self.grid_manager.grids, self.grid_manager.central_price
@@ -27,13 +27,10 @@ class OrderManager:
             return
         
         grid_level_crossed = self.grid_levels[grid_price]
-        try:
-            if order_type == OrderType.BUY:
-                self._process_buy_order(grid_level_crossed, current_price, timestamp)
-            elif order_type == OrderType.SELL:
-                self._process_sell_order(grid_level_crossed, current_price, timestamp)
-        except ValueError as e:
-            self.logger.warning(f"Failed to place {order_type} order: {e}")
+        if order_type == OrderType.BUY:
+            self._process_buy_order(grid_level_crossed, current_price, timestamp)
+        elif order_type == OrderType.SELL:
+            self._process_sell_order(grid_level_crossed, current_price, timestamp)
     
     def get_orders(self):
         buy_orders = [order for grid_level in self.grid_levels.values() for order in grid_level.buy_orders]

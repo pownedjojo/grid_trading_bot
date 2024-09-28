@@ -104,6 +104,9 @@ class ConfigManager:
     def get_percentage_spacing(self):
         grid_settings = self.get_grid_settings()
         return grid_settings.get('percentage_spacing', None)
+    
+    def get_trade_percentage(self):
+        return self.config['grid'].get('trade_percentage', None)
 
     # --- Limits (Take Profit / Stop Loss) Accessor Methods ---
     def get_limits(self):

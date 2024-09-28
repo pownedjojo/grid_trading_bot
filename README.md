@@ -108,7 +108,8 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
     "bottom_range": 3200,
     "spacing_type": "arithmetic",
     "grid_spacing": 200,
-    "percentage_spacing": 0.05
+    "percentage_spacing": 0.05,
+    "trade_percentage": 0.1
   },
   "limits": {
     "max_orders": 10
@@ -123,7 +124,7 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
 
 - **exchange**: Defines the exchange and trading fee to be used.
   - **name**: The name of the exchange (e.g., binance).
-  - **trading_fee**: The trading fee should be in decimal format (e.g., 0.001 for 0.1%)
+  - **trading_fee**: The trading fee should be in decimal format (e.g., 0.001 for 0.1%).
 - **pair**: Specifies the trading pair.
   - **base_currency**: The base currency (e.g., ETH).
   - **quote_currency**: The quote currency (e.g., USDT).
@@ -139,6 +140,7 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
   - **spacing_type**: The type of spacing (arithmetic or geometric).
   - **grid_spacing**: The spacing between grids (used for arithmetic spacing).
   - **percentage_spacing**: The percentage spacing between grids (used for geometric spacing).
+  - **trade_percentage**: The percentage of available balance used to place each trade (e.g., 0.1 for 10%).
 - **limits**: Configurations for risk management.
   - **take_profit**: Settings for taking profit.
     - **is_active**: Whether the take profit is active.

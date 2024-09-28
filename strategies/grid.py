@@ -59,11 +59,5 @@ class GridTradingStrategy(TradingStrategy):
         self.plotter.plot_results(self.data)
     
     def _execute_orders(self, current_price, previous_price, current_timestamp):
-        self._handle_order_execution(current_price, previous_price, current_timestamp, OrderType.BUY)
-        self._handle_order_execution(current_price, previous_price, current_timestamp, OrderType.SELL)
-    
-    def _handle_order_execution(self, current_price, previous_price, timestamp, order_type: OrderType):
-        try:
-            self.order_manager.execute_order(order_type, current_price, previous_price, timestamp)
-        except ValueError as e:
-            self.logger.error(f"Error placing {order_type} order: {e}")
+        self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, timestamp)
+        self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, timestamp)

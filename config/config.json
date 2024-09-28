@@ -19,7 +19,8 @@
     "bottom_range": 2850,
     "spacing_type": "arithmetic",
     "grid_spacing": 200,
-    "percentage_spacing": 0.05
+    "percentage_spacing": 0.05,
+    "trade_percentage": 0.1
   },
   "limits": {
     "take_profit": {

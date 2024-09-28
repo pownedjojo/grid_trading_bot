@@ -59,5 +59,5 @@ class GridTradingStrategy(TradingStrategy):
         self.plotter.plot_results(self.data)
     
     def _execute_orders(self, current_price, previous_price, current_timestamp):
-        self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, timestamp)
-        self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, timestamp)
+        self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)
+        self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, current_timestamp)

@@ -31,7 +31,6 @@ class GridTradingStrategy(TradingStrategy):
     def _initialize_strategy(self, pair, timeframe, start_date, end_date):
         self.load_data(self.data_manager.fetch_ohlcv(pair, timeframe, start_date, end_date))
         self.order_manager.initialize_grid_levels()
-        self.start_crypto_balance = self.balance_tracker.crypto_balance
 
     def simulate(self):
         self.logger.info("Start trading simulation")

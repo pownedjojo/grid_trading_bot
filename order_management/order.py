@@ -1,4 +1,5 @@
 from enum import Enum
+from .exceptions import InvalidOrderTypeError
 
 class OrderType(Enum):
     BUY = 'buy'
@@ -12,7 +13,7 @@ class OrderState(Enum):
 class Order:
     def __init__(self, price, quantity, order_type, timestamp):
         if not isinstance(order_type, OrderType):
-            raise ValueError("Invalid order type")
+            raise InvalidOrderTypeError("Invalid order type")
 
         self.price = price
         self.quantity = quantity

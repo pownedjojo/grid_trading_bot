@@ -50,8 +50,13 @@ class OrderManager:
             self.logger.error(f"Unexpected error in _process_buy_order: {e}")
     
     def _process_sell_order(self, grid_level, current_price, timestamp):
+        buy_grid_level = self.grid_manager.find_lowest_completed_buy_grid(self.grid_levels)
+
+        if buy_grid_level is None:
+            self.logger.info(f"No grid level found with a completed buy order.")
+            return
+
         try:
-            buy_grid_level = self.grid_manager.find_lowest_completed_buy_grid(self.grid_levels)
             buy_order = buy_grid_level.buy_orders[-1]
             quantity = buy_order.quantity
             self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, quantity, grid_level)

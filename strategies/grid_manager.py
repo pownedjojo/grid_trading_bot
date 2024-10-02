@@ -19,7 +19,7 @@ class GridManager:
             grid_level = grid_levels.get(price)
             if grid_level and grid_level.can_place_sell_order():
                 return grid_level
-        raise ValueError("No grid level found with a completed buy order.")
+        return None
 
     def _extract_config(self):
         bottom_range = self.config_manager.get_bottom_range()
@@ -39,6 +39,4 @@ class GridManager:
             for _ in range(1, num_grids):
                 grids.append(grids[-1] * (1 + percentage_spacing))
             central_price = (top_range * bottom_range) ** percentage_spacing
-        else:
-            raise ValueError("Invalid spacing_type - must be either 'arithmetic' or 'geometric'")
         return grids, central_price

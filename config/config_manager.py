@@ -1,9 +1,10 @@
 import json, os, logging
-from .exceptions import ConfigFileNotFoundError, ConfigValidationError, ConfigParseError
+from .exceptions import ConfigFileNotFoundError, ConfigParseError
 
 class ConfigManager:
-    def __init__(self, config_file):
+    def __init__(self, config_file, config_validator):
         self.config_file = config_file
+        self.config_validator = config_validator
         self.config = None
         self.logger = logging.getLogger(self.__class__.__name__)
         self.load_config()
@@ -16,19 +17,10 @@ class ConfigManager:
         with open(self.config_file, 'r') as file:
             try:
                 self.config = json.load(file)
-                self.validate_config()
+                self.config_validator.validate(self.config)
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse config file {self.config_file}: {e}")
                 raise ConfigParseError(self.config_file, e)
-
-    def validate_config(self):
-        required_fields = ['exchange', 'pair', 'timeframe', 'period', 'initial_balance', 'grid', 'limits', 'logging']
-        missing_fields = [field for field in required_fields if field not in self.config]
-        if missing_fields:
-            self.logger.error(f"Missing required config fields: {missing_fields}")
-            raise ConfigValidationError(missing_fields)
-        
-        self.logger.info("Configuration validation passed.")
 
     def get(self, key, default=None):
         return self.config.get(key, default)

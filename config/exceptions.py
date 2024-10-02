@@ -1,4 +1,5 @@
 class ConfigError(Exception):
+    """Base class for all configuration-related errors."""
     pass
 
 class ConfigFileNotFoundError(ConfigError):
@@ -8,9 +9,15 @@ class ConfigFileNotFoundError(ConfigError):
         super().__init__(self.message)
 
 class ConfigValidationError(ConfigError):
-    def __init__(self, missing_fields, message="Configuration validation error"):
-        self.missing_fields = missing_fields
-        self.message = f"{message}: Missing required fields - {', '.join(missing_fields)}"
+    def __init__(self, missing_fields=None, invalid_fields=None, message="Configuration validation error"):
+        self.missing_fields = missing_fields or []
+        self.invalid_fields = invalid_fields or []
+        details = []
+        if self.missing_fields:
+            details.append(f"Missing required fields - {', '.join(self.missing_fields)}")
+        if self.invalid_fields:
+            details.append(f"Invalid fields - {', '.join(self.invalid_fields)}")
+        self.message = f"{message}: {', '.join(details)}"
         super().__init__(self.message)
 
 class ConfigParseError(ConfigError):

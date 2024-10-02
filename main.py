@@ -10,7 +10,8 @@ from strategies.grid_manager import GridManager
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from config.logging_config import setup_logging
 from config.config_manager import ConfigManager
-from config.exceptions import ConfigFileNotFoundError, ConfigParseError, ConfigValidationError
+from config.config_validator import ConfigValidator
+from config.exceptions import ConfigError
 from data.exceptions import UnsupportedExchangeError, DataFetchError
 
 class GridTradingBot:
@@ -46,7 +47,7 @@ class GridTradingBot:
             strategy.simulate()
             strategy.plot_results()
             performance_summary = strategy.generate_performance_report()
-        except (ConfigFileNotFoundError, ConfigParseError, ConfigValidationError) as e:
+        except ConfigError as e:
             self.handle_config_error(e)
         except (UnsupportedExchangeError, DataFetchError) as e:
             self.handle_data_manager_error(e)
@@ -55,8 +56,8 @@ class GridTradingBot:
 
     def initialize_config_manager(self):
         try:
-            return ConfigManager(self.config_path)
-        except (ConfigFileNotFoundError, ConfigParseError, ConfigValidationError) as e:
+            return ConfigManager(self.config_path, ConfigValidator())
+        except ConfigError as e:
             raise e
 
     def handle_config_error(self, exception):

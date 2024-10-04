@@ -1,4 +1,4 @@
-from validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
+from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
 
 class BalanceTracker:
     def __init__(self, fee_calculator, initial_balance, initial_crypto_balance=0):

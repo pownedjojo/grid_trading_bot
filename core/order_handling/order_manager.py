@@ -1,6 +1,6 @@
 import logging
 from .order import Order, OrderType
-from validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
+from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 
 class OrderManager:
     def __init__(self, config_manager, grid_manager, transaction_validator, balance_tracker, order_book):

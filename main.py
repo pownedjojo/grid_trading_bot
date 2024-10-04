@@ -1,6 +1,6 @@
 import argparse, logging, traceback
 from core.services.data_manager import DataManager
-from strategies.grid import GridTradingStrategy
+from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from core.order_handling.order_manager import OrderManager

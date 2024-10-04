@@ -1,5 +1,5 @@
 from enum import Enum
-from .exceptions import InvalidOrderTypeError
+from validation.exceptions import InvalidOrderTypeError
 
 class OrderType(Enum):
     BUY = 'buy'

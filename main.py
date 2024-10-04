@@ -1,19 +1,19 @@
 import argparse, logging, traceback
-from data.data_manager import DataManager
+from core.services.data_manager import DataManager
 from strategies.grid import GridTradingStrategy
-from order_management.order_manager import OrderManager
-from order_management.transaction_validator import TransactionValidator
-from order_management.fee_calculator import FeeCalculator
-from order_management.balance_tracker import BalanceTracker
-from order_management.order_book import OrderBook
 from strategies.plotter import Plotter
-from strategies.grid_manager import GridManager
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
-from config.logging_config import setup_logging
+from core.order_handling.order_manager import OrderManager
+from core.validation.transaction_validator import TransactionValidator
+from core.order_handling.fee_calculator import FeeCalculator
+from core.order_handling.balance_tracker import BalanceTracker
+from core.order_handling.order_book import OrderBook
+from core.grid_management.grid_manager import GridManager
+from core.services.exceptions import UnsupportedExchangeError, DataFetchError
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
-from data.exceptions import UnsupportedExchangeError, DataFetchError
+from utils.logging_config import setup_logging
 
 class GridTradingBot:
     def __init__(self, config_path):

@@ -1,5 +1,4 @@
-import ccxt
-import logging
+import ccxt, logging
 import pandas as pd
 from .exceptions import UnsupportedExchangeError, DataFetchError
 
@@ -52,18 +51,18 @@ class DataManager:
     
     def _get_candle_limit(self):
         candle_limits = {
-        'binance': 1000,
-        'coinbase': 300,
-        'kraken': 720,
-        'bitfinex': 5000,
-        'bitstamp': 1000,
-        'huobi': 2000,
-        'okex': 1440,
-        'bybit': 200,
-        'bittrex': 500,
-        'poloniex': 500,
-        'gateio': 1000,
-        'kucoin': 1500
+            'binance': 1000,
+            'coinbase': 300,
+            'kraken': 720,
+            'bitfinex': 5000,
+            'bitstamp': 1000,
+            'huobi': 2000,
+            'okex': 1440,
+            'bybit': 200,
+            'bittrex': 500,
+            'poloniex': 500,
+            'gateio': 1000,
+            'kucoin': 1500
         }
         return candle_limits.get(self.exchange_name, 500) # Default to 500 if not found
 

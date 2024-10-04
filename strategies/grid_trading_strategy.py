@@ -1,7 +1,7 @@
 import logging, itertools
 import numpy as np
 from .base import TradingStrategy
-from order_management.order import OrderType
+from core.order_handling.order import OrderType
 
 class GridTradingStrategy(TradingStrategy):
     def __init__(self, config_manager, data_manager, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter):

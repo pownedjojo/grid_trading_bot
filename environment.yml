@@ -11,4 +11,5 @@ dependencies:
   - pip:
     - ccxt
     - configparser
+    - pytest
     - tabulate

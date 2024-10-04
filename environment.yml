@@ -1,13 +1,14 @@
-name: grid_trading_bot
+name: GridTradingBot
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.11
-  - ccxt
   - pandas
   - numpy
   - plotly
   - pip
   - pip:
+    - ccxt
     - configparser
+    - tabulate

@@ -1,5 +1,4 @@
 from enum import Enum, auto
-from .order import Order, OrderType
 
 class GridCycleState(Enum):
     READY_TO_BUY = auto()

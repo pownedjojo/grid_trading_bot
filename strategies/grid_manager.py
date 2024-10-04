@@ -1,4 +1,5 @@
 import numpy as np
+from .grid_level import GridLevel, GridCycleState
 
 class GridManager:
     def __init__(self, config_manager):
@@ -6,6 +7,13 @@ class GridManager:
         self.grids, self.central_price = self._calculate_grids_and_central_price()
         self.sorted_buy_grids = [grid for grid in self.grids if grid <= self.central_price]
         self.sorted_sell_grids = [grid for grid in self.grids if grid > self.central_price]
+        self.grid_levels = {}
+    
+    def initialize_grid_levels(self):
+        self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY if price <= self.central_price else GridCycleState.READY_TO_SELL) for price in self.grids}
+    
+    def get_grid_level(self, price):
+        return self.grid_levels.get(price)
     
     def detect_grid_level_crossing(self, current_price, previous_price, sell=False):
         grid_list = self.sorted_sell_grids if sell else self.sorted_buy_grids
@@ -14,9 +22,9 @@ class GridManager:
                 return grid_price
         return None
 
-    def find_lowest_completed_buy_grid(self, grid_levels):
+    def find_lowest_completed_buy_grid(self):
         for price in self.sorted_buy_grids:
-            grid_level = grid_levels.get(price)
+            grid_level = self.grid_levels.get(price)
             if grid_level and grid_level.can_place_sell_order():
                 return grid_level
         return None

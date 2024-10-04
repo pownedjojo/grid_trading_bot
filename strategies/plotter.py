@@ -1,16 +1,16 @@
 import plotly.graph_objects as go
 
 class Plotter:
-    def __init__(self, config_manager, grid_manager, order_manager):
-        self.config_manager = config_manager
+    def __init__(self, grid_manager, order_book):
         self.grid_manager = grid_manager
-        self.order_manager = order_manager
+        self.order_book = order_book
 
     def plot_results(self, data):
         fig = self.create_base_figure(data)
         grids, central_price = self.grid_manager.grids, self.grid_manager.central_price
         self.add_grid_lines(fig, grids, central_price)
-        buy_orders, sell_orders = self.order_manager.get_orders()
+        buy_orders = self.order_book.get_all_buy_orders()
+        sell_orders = self.order_book.get_all_sell_orders()
         self.add_orders(fig, buy_orders, sell_orders)
         self.finalize_figure(fig)
         fig.show()

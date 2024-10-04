@@ -2,10 +2,12 @@ import numpy as np
 from tabulate import tabulate
 from order_management.order import OrderType
 
+ANNUAL_RISK_FREE_RATE = 0.03  # annual risk free rate 3%
+
 class TradingPerformanceAnalyzer:
-    def __init__(self, config_manager, order_manager):
+    def __init__(self, config_manager, order_book):
         self.config_manager = config_manager
-        self.order_manager = order_manager
+        self.order_book = order_book
         self.initial_balance, self.base_currency, self.quote_currency, self.trading_fee = self.extract_config()
     
     def extract_config(self):
@@ -22,18 +24,19 @@ class TradingPerformanceAnalyzer:
     def calculate_trading_gains(self):
         total_buy_cost = 0
         total_sell_revenue = 0
-        
-        for grid_level in self.order_manager.grid_levels.values():
-            for buy_order in grid_level.buy_orders:
-                trade_value = buy_order.quantity * buy_order.price
-                buy_fee = trade_value * self.trading_fee
-                total_buy_cost += trade_value + buy_fee
+        buy_orders = self.order_book.get_all_buy_orders()
+        sell_orders = self.order_book.get_all_sell_orders()
 
-            for sell_order in grid_level.sell_orders:
-                trade_value = sell_order.quantity * sell_order.price
-                sell_fee = trade_value * self.trading_fee
-                total_sell_revenue += trade_value - sell_fee
-        
+        for buy_order in buy_orders:
+            trade_value = buy_order.quantity * buy_order.price
+            buy_fee = trade_value * self.trading_fee
+            total_buy_cost += trade_value + buy_fee
+
+        for sell_order in sell_orders:
+            trade_value = sell_order.quantity * sell_order.price
+            sell_fee = trade_value * self.trading_fee
+            total_sell_revenue += trade_value - sell_fee
+
         grid_trading_gains = total_sell_revenue - total_buy_cost
         return grid_trading_gains
 
@@ -55,38 +58,39 @@ class TradingPerformanceAnalyzer:
         return time_in_profit, time_in_loss
     
     def calculate_sharpe_ratio(self, data):
-        risk_free_rate = 0.02  # annual risk free rate 2%
-        returns = data['account_value'].pct_change().dropna()
-        excess_returns = returns - risk_free_rate / 252 # Adjusted daily
+        returns = data['account_value'].pct_change(fill_method=None)
+        excess_returns = returns - ANNUAL_RISK_FREE_RATE / 252 # Adjusted daily
         sharpe_ratio = excess_returns.mean() / excess_returns.std() * np.sqrt(252)
         return round(sharpe_ratio, 2)
     
     def calculate_sortino_ratio(self, data):
-        risk_free_rate = 0.02  # annual risk free rate 2%
-        returns = data['account_value'].pct_change().dropna()
-        excess_returns = returns - risk_free_rate / 252  # Adjusted daily
+        returns = data['account_value'].pct_change(fill_method=None)
+        excess_returns = returns - ANNUAL_RISK_FREE_RATE / 252  # Adjusted daily
         downside_returns = excess_returns[excess_returns < 0]
         sortino_ratio = excess_returns.mean() / downside_returns.std() * np.sqrt(252)
         return round(sortino_ratio, 2)
 
     def display_orders(self):
         orders = []
-        for grid_level in self.order_manager.grid_levels.values():
-            for buy_order in grid_level.buy_orders:
-                orders.append(self.format_order(buy_order, grid_level))
-            for sell_order in grid_level.sell_orders:
-                orders.append(self.format_order(sell_order, grid_level))
+        buy_orders_with_grid = self.order_book.get_buy_orders_with_grid()
+        sell_orders_with_grid = self.order_book.get_sell_orders_with_grid()
 
-        orders.sort(key=lambda x: x[3])  # x[3] is the timestamp
+        for buy_order, grid_level in buy_orders_with_grid:
+            orders.append(self.format_order(buy_order, grid_level))
+
+        for sell_order, grid_level in sell_orders_with_grid:
+            orders.append(self.format_order(sell_order, grid_level))
+        
+        orders.sort(key=lambda x: (x[3] is None, x[3]))  # x[3] is the timestamp, sort None to the end
         print(tabulate(orders, headers=["Order Type", "Price", "Quantity", "Timestamp", "Grid Level"], tablefmt="pipe"))
-
+    
     def format_order(self, order, grid_level):
-        order_type = "BUY" if order.order_type == OrderType.BUY else "SELL"
-        return [order_type, order.price, order.quantity, order.timestamp, grid_level.price]
+        grid_level_price = grid_level.price if grid_level else "N/A"
+        return [order.order_type.name, order.price, order.quantity, order.timestamp, grid_level_price]
     
     def calculate_trade_counts(self):
-        num_buy_trades = sum(len(grid_level.buy_orders) for grid_level in self.order_manager.grid_levels.values())
-        num_sell_trades = sum(len(grid_level.sell_orders) for grid_level in self.order_manager.grid_levels.values())
+        num_buy_trades = len(self.order_book.get_all_buy_orders())
+        num_sell_trades = len(self.order_book.get_all_sell_orders())
         return num_buy_trades, num_sell_trades
     
     def calculate_buy_and_hold_return(self, data, final_price):

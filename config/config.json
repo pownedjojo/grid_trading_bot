@@ -29,7 +29,7 @@
     },
     "stop_loss": {
       "is_active": false,
-      "threshold": 3100
+      "threshold": 2830
     }
   },
   "logging": {

@@ -29,3 +29,6 @@ class BalanceTracker:
     def sell_all(self, price):
         if self.crypto_balance > 0:
             self.update_after_sell(self.crypto_balance, price)
+    
+    def get_total_balance_value(self, price):
+        return self.balance + self.crypto_balance * price

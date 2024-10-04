@@ -35,8 +35,8 @@ class GridTradingStrategy(TradingStrategy):
             if self._check_take_profit_stop_loss(current_price, current_timestamp):
                 break
             self._execute_orders(current_price, previous_price, current_timestamp)
-            self.data['account_value'].loc[current_timestamp] = self.balance_tracker.balance + self.balance_tracker.crypto_balance * current_price
-
+            self.data.loc[current_timestamp, 'account_value'] = self.balance_tracker.get_total_balance_value(current_price)
+    
     def generate_performance_report(self):
         final_price = self.close_prices[-1]
         self.trading_performance_analyzer.generate_performance_summary(

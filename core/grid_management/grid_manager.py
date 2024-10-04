@@ -18,7 +18,7 @@ class GridManager:
     def detect_grid_level_crossing(self, current_price, previous_price, sell=False):
         grid_list = self.sorted_sell_grids if sell else self.sorted_buy_grids
         for grid_price in grid_list:
-            if (sell and previous_price < grid_price <= current_price) or (not sell and previous_price > grid_price >= current_price):
+            if (sell and previous_price < grid_price <= current_price) or (not sell and previous_price >= grid_price >= current_price):
                 return grid_price
         return None
 

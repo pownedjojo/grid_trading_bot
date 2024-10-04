@@ -1,11 +1,7 @@
 import logging, itertools
 import numpy as np
-from .plotter import Plotter
 from .base import TradingStrategy
-from .grid_manager import GridManager
-from order_management.order_manager import OrderManager
-from order_management.order import Order, OrderType
-from .trading_performance_analyzer import TradingPerformanceAnalyzer
+from order_management.order import OrderType
 
 class GridTradingStrategy(TradingStrategy):
     def __init__(self, config_manager, data_manager, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter):
@@ -47,7 +43,8 @@ class GridTradingStrategy(TradingStrategy):
             self.data, 
             self.balance_tracker.balance, 
             self.balance_tracker.crypto_balance, 
-            final_price
+            final_price,
+            self.balance_tracker.total_fees
         )
 
     def plot_results(self):

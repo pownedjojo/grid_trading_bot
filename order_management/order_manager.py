@@ -1,6 +1,5 @@
 import logging
 from .order import Order, OrderType
-from .balance_tracker import BalanceTracker
 from .exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 
 class OrderManager:

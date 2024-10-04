@@ -1,6 +1,5 @@
 import numpy as np
 from tabulate import tabulate
-from order_management.order import OrderType
 
 ANNUAL_RISK_FREE_RATE = 0.03  # annual risk free rate 3%
 
@@ -97,7 +96,7 @@ class TradingPerformanceAnalyzer:
         initial_price = data['close'].iloc[0]
         return ((final_price - initial_price) / initial_price) * 100
 
-    def generate_performance_summary(self, data, balance, crypto_balance, final_crypto_price):
+    def generate_performance_summary(self, data, balance, crypto_balance, final_crypto_price, total_fees):
         self.display_orders()
         pair = f"{self.base_currency}/{self.quote_currency}"
         start_date = data.index[0]
@@ -126,6 +125,7 @@ class TradingPerformanceAnalyzer:
             ["Time in Loss %", f"{time_in_loss:.2f}%"],
             ["Buy and Hold Return %", f"{buy_and_hold_return:.2f}%"],
             ["Grid Trading Gains", f"{grid_trading_gains:.2f}"],
+            ["Total Fees", f"{total_fees:.2f}"],
             ["Final Balance", f"{final_balance:.2f}"],
             ["Number of Buy Trades", num_buy_trades],
             ["Number of Sell Trades", num_sell_trades],

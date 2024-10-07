@@ -27,9 +27,12 @@ jobs:
       run: |
         conda env create --file environment.yml --name GridTradingBot || conda env update --file environment.yml --name GridTradingBot
 
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+
     - name: Activate Conda environment and run tests
       run: |
-        conda run -n GridTradingBot python -m pip install --upgrade pip  # Update pip inside the Conda environment
+        conda run -n GridTradingBot python -m pip install --upgrade pip
         conda run -n GridTradingBot pytest --cov=core  # Run tests using pytest
 
     - name: Upload coverage report

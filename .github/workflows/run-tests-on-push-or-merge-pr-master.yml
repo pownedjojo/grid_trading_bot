@@ -33,10 +33,4 @@ jobs:
     - name: Activate Conda environment and run tests
       run: |
         conda run -n GridTradingBot python -m pip install --upgrade pip
-        conda run -n GridTradingBot pytest --cov=core  # Run tests using pytest
-
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v3
-      with:
-        name: coverage-report
-        path: coverage.xml
+        conda run -n GridTradingBot pytest --cov=core

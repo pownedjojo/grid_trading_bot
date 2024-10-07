@@ -81,11 +81,20 @@ class TradingPerformanceAnalyzer:
             orders.append(self.format_order(sell_order, grid_level))
         
         orders.sort(key=lambda x: (x[3] is None, x[3]))  # x[3] is the timestamp, sort None to the end
-        print(tabulate(orders, headers=["Order Type", "Price", "Quantity", "Timestamp", "Grid Level"], tablefmt="pipe"))
+        print(tabulate(orders, headers=["Order Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe"))
     
     def format_order(self, order, grid_level):
         grid_level_price = grid_level.price if grid_level else "N/A"
-        return [order.order_type.name, order.price, order.quantity, order.timestamp, grid_level_price]
+        # Assuming order.price is the execution price and grid level price the expected price
+        slippage = ((order.price - grid_level_price) / grid_level_price) * 100 if grid_level else "N/A"
+        return [
+            order.order_type.name,
+            order.price, 
+            order.quantity, 
+            order.timestamp, 
+            grid_level_price, 
+            f"{slippage:.2f}%" if grid_level else "N/A"
+        ]
     
     def calculate_trade_counts(self):
         num_buy_trades = len(self.order_book.get_all_buy_orders())

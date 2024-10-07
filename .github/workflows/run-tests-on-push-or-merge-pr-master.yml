@@ -22,20 +22,17 @@ jobs:
         auto-update-conda: true
         python-version: 3.11
 
-    - name: Initialize Conda
-      run: |
-        conda init bash
-        source ~/.bashrc
-
     - name: Create or update Conda environment
-      run: |
-        conda env create --file environment.yml --name GridTradingBot || conda env update --file environment.yml --name GridTradingBot
-        conda init
-        conda activate GridTradingBot
-
-    - name: Run tests
       shell: bash -l {0}
       run: |
+        conda env create --file environment.yml --name GridTradingBot || conda env update --file environment.yml --name GridTradingBot
+
+    - name: Activate Conda environment and run tests
+      shell: bash -l {0}
+      run: |
+        source ~/miniconda/etc/profile.d/conda.sh
+        conda activate GridTradingBot
+        python -m pip install --upgrade pip  # Update pip inside the environment
         pytest --cov=core
 
     - name: Upload coverage report

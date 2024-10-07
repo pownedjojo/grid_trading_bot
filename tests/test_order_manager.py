@@ -49,14 +49,14 @@ class TestOrderManager:
 
     def test_execute_sell_order_with_valid_grid_cross(self, order_manager, mock_dependencies):
         grid_level = Mock()
-        buy_order = Mock()
+        buy_order = Mock(quantity=5)
         
         mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
         mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
         mock_dependencies['balance_tracker'].crypto_balance = 5
         
         buy_grid_level = Mock()
-        buy_grid_level.buy_orders = [buy_order]  # This should behave like a list with a single buy_order
+        buy_grid_level.buy_orders = [buy_order]
         mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = buy_grid_level
         
         order_manager.execute_order(OrderType.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
@@ -117,6 +117,8 @@ class TestOrderManager:
         grid_level = Mock()
         buy_order_1 = Mock(quantity=2)
         buy_order_2 = Mock(quantity=3)
+        mock_dependencies['balance_tracker'].crypto_balance = 5
+
         
         mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = Mock(buy_orders=[buy_order_1, buy_order_2])
         mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
@@ -140,15 +142,21 @@ class TestOrderManager:
     
     def test_extreme_price_fluctuation(self, order_manager, mock_dependencies):
         grid_level = Mock()
+
         mock_dependencies['grid_manager'].detect_grid_level_crossing.side_effect = [None, 5000]
         mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
-        
-        # Execute with no grid crossing initially, then detect crossing
+
         order_manager.execute_order(OrderType.BUY, 5000, 1000, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.assert_called_with(5000, 1000)
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_called_once()
-        mock_dependencies['balance_tracker'].update_after_buy.assert_called_once()
+
+        mock_dependencies['grid_manager'].detect_grid_level_crossing.assert_called_once_with(5000, 1000, sell=False)
+        mock_dependencies['grid_manager'].get_grid_level.assert_not_called()  # No grid crossing, so no grid level
+
+        # Reset mock call tracking for the second execution
+        mock_dependencies['grid_manager'].detect_grid_level_crossing.reset_mock()
+
+        order_manager.execute_order(OrderType.BUY, 5000, 4000, "2024-01-01T00:01:00Z")
+        mock_dependencies['grid_manager'].detect_grid_level_crossing.assert_called_once_with(5000, 4000, sell=False)
+        mock_dependencies['grid_manager'].get_grid_level.assert_called_once_with(5000)
 
     def test_negative_price_handling(self, order_manager, mock_dependencies):
         grid_level = Mock()
@@ -169,9 +177,7 @@ class TestOrderManager:
 
         order_manager.execute_order(OrderType.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
         
-        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(
-            3, buy_order.quantity, grid_level
-        )
+        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(3, buy_order.quantity, grid_level)
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(3, 1000)
     
     def test_minimal_price_difference(self, order_manager, mock_dependencies):

@@ -36,10 +36,11 @@ class OrderManager:
     def _process_buy_order(self, grid_level, current_price, timestamp):
         try:
             quantity = self.trade_percentage * self.balance_tracker.balance / current_price
-            self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
-            self._place_order(grid_level, OrderType.BUY, current_price, quantity, timestamp)
-            self.balance_tracker.update_after_buy(quantity, current_price)
-        except (InsufficientBalanceError, GridLevelNotReadyError, InsufficientCryptoBalanceError) as e:
+            if quantity > 0:
+                self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
+                self._place_order(grid_level, OrderType.BUY, current_price, quantity, timestamp)
+                self.balance_tracker.update_after_buy(quantity, current_price)
+        except (InsufficientBalanceError, GridLevelNotReadyError) as e:
             self.logger.info(f"Cannot process buy order: {e}")
         except Exception as e:
             self.logger.error(f"Unexpected error while processing buy order: {e}")
@@ -53,12 +54,15 @@ class OrderManager:
 
         try:
             buy_order = buy_grid_level.buy_orders[-1]
-            quantity = buy_order.quantity
-            self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, quantity, grid_level)
-            self._place_order(grid_level, OrderType.SELL, current_price, quantity, timestamp)
-            self.balance_tracker.update_after_sell(quantity, current_price)
-            self._reset_grid_cycle(buy_grid_level)
-        except (InsufficientBalanceError, GridLevelNotReadyError, InsufficientCryptoBalanceError) as e:
+            quantity = min(buy_order.quantity, self.balance_tracker.crypto_balance)
+            if quantity > 0:
+                self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, buy_order.quantity, grid_level)
+                self._place_order(grid_level, OrderType.SELL, current_price, quantity, timestamp)
+                self.balance_tracker.update_after_sell(quantity, current_price)
+                
+                if quantity == buy_order.quantity: # Handle partial sells - reset only if buy order quantity fully sold
+                    self._reset_grid_cycle(buy_grid_level)
+        except (GridLevelNotReadyError, InsufficientCryptoBalanceError) as e:
             self.logger.info(f"Cannot process sell order: {e}")
         except Exception as e:
             self.logger.error(f"Unexpected error while processing sell order: {e}")

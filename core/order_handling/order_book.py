@@ -27,10 +27,6 @@ class OrderBook:
 
     def get_non_grid_orders(self):
         return self.non_grid_orders
-
-    def get_all_orders(self):
-        all_orders = self.buy_orders + self.sell_orders + self.non_grid_orders
-        return all_orders
     
     def get_all_buy_orders(self):
         return self.buy_orders

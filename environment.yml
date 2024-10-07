@@ -2,7 +2,6 @@ name: GridTradingBot
 channels:
   - conda-forge
   - defaults
-channel_priority: strict
 dependencies:
   - python=3.11
   - pandas=1.5.3

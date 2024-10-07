@@ -15,18 +15,23 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Install Miniconda
       uses: goanpeca/setup-miniconda@v2
       with:
         auto-update-conda: true
-        python-version: 3.11  # Use Python 3.11
+        python-version: 3.11
+
+    - name: Initialize Conda
+      run: |
+        conda init bash
+        source ~/.bashrc  # Reload shell to apply conda changes
 
     - name: Create or update Conda environment
       run: |
         conda env create --file environment.yml --name GridTradingBot || conda env update --file environment.yml --name GridTradingBot
         conda activate GridTradingBot
-    
+
     - name: Run tests
       shell: bash -l {0}
       run: |

@@ -1,4 +1,4 @@
-import ccxt, logging
+import ccxt, logging, time
 import pandas as pd
 from .exceptions import UnsupportedExchangeError, DataFetchError
 
@@ -30,7 +30,8 @@ class DataManager:
     def _fetch_ohlcv_once(self, pair, timeframe, since, until):
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)
         df = self._format_ohlcv(ohlcv)
-        return df[df.index <= until]
+        until_timestamp = pd.to_datetime(until, unit='ms')
+        return df[df.index <= until_timestamp]
 
     def _fetch_ohlcv_in_chunks(self, pair, timeframe, since, until, candles_per_request):
         all_ohlcv = []

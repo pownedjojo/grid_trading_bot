@@ -28,6 +28,7 @@ jobs:
 
     - name: Run tests
       run: |
+        conda activate GridTradingBot
         pytest --cov=core
 
     - name: Upload coverage report

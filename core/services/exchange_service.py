@@ -1,18 +1,33 @@
 import ccxt, logging, time
 import pandas as pd
-from .exceptions import UnsupportedExchangeError, DataFetchError
+from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
+from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 
-class DataManager:
+class ExchangeService:
     def __init__(self, config_manager):
         self.config_manager = config_manager
         self.logger = logging.getLogger(__name__)
         self.exchange_name = self.config_manager.get_exchange_name()
+        self.exchange = self._initialize_exchange()
+
+    def _initialize_exchange(self):
         try:
-            self.exchange = getattr(ccxt, self.exchange_name)()
+            return getattr(ccxt, self.exchange_name)()
         except AttributeError:
             raise UnsupportedExchangeError(f"The exchange '{self.exchange_name}' is not supported.")
+    
+    def _is_timeframe_supported(self, timeframe):
+        supported_timeframes = self.exchange.timeframes
+        if timeframe in supported_timeframes:
+            return True
+        else:
+            self.logger.warning(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
+            return False
 
     def fetch_ohlcv(self, pair, timeframe, start_date, end_date):
+        if not self._is_timeframe_supported(timeframe):
+            raise UnsupportedTimeframeError(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
+
         self.logger.info(f"Fetching OHLCV data for {pair} from {start_date} to {end_date}")
         try:
             since = self.exchange.parse8601(start_date)
@@ -23,15 +38,17 @@ class DataManager:
             if total_candles_needed > candles_per_request:
                 return self._fetch_ohlcv_in_chunks(pair, timeframe, since, until, candles_per_request)
             else:
-                return self._fetch_ohlcv_once(pair, timeframe, since, until)
+                return self._fetch_ohlcv_single_batch(pair, timeframe, since, until)
+        except ccxt.NetworkError as e:
+            raise DataFetchError(f"Network issue occurred while fetching OHLCV data: {str(e)}")
+        except ccxt.BaseError as e:
+            raise DataFetchError(f"Exchange-specific error occurred: {str(e)}")
         except Exception as e:
             raise DataFetchError(f"Failed to fetch OHLCV data {str(e)}.")
 
-    def _fetch_ohlcv_once(self, pair, timeframe, since, until):
+    def _fetch_ohlcv_single_batch(self, pair, timeframe, since, until):
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)
-        df = self._format_ohlcv(ohlcv)
-        until_timestamp = pd.to_datetime(until, unit='ms')
-        return df[df.index <= until_timestamp]
+        return self._format_ohlcv(ohlcv, until)
 
     def _fetch_ohlcv_in_chunks(self, pair, timeframe, since, until, candles_per_request):
         all_ohlcv = []
@@ -41,41 +58,21 @@ class DataManager:
                 break
             all_ohlcv.extend(ohlcv)
             since = ohlcv[-1][0] + 1
-        
-        return self._format_ohlcv(all_ohlcv)
+            self.logger.info(f"Fetched up to {pd.to_datetime(since, unit='ms')}")
+        return self._format_ohlcv(all_ohlcv, until)
 
-    def _format_ohlcv(self, ohlcv):
+    def _format_ohlcv(self, ohlcv, until):
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
-        return df
+        until_timestamp = pd.to_datetime(until, unit='ms')
+        return df[df.index <= until_timestamp]
     
     def _get_candle_limit(self):
-        candle_limits = {
-            'binance': 1000,
-            'coinbase': 300,
-            'kraken': 720,
-            'bitfinex': 5000,
-            'bitstamp': 1000,
-            'huobi': 2000,
-            'okex': 1440,
-            'bybit': 200,
-            'bittrex': 500,
-            'poloniex': 500,
-            'gateio': 1000,
-            'kucoin': 1500
-        }
-        return candle_limits.get(self.exchange_name, 500) # Default to 500 if not found
+        return CANDLE_LIMITS.get(self.exchange_name, 500)  # Default to 500 if not found
 
     def _get_timeframe_in_ms(self, timeframe):
-        timeframe_mappings = {
-            '1m': 60 * 1000,
-            '5m': 5 * 60 * 1000,
-            '15m': 15 * 60 * 1000,
-            '1h': 60 * 60 * 1000,
-            '1d': 24 * 60 * 60 * 1000
-        }
-        return timeframe_mappings.get(timeframe, 60 * 1000)  # Default to 1m if not found
+        return TIMEFRAME_MAPPINGS.get(timeframe, 60 * 1000)  # Default to 1m if not found
 
     def _fetch_with_retry(self, method, *args, retries=3, delay=5, **kwargs):
         for attempt in range(retries):
@@ -86,4 +83,5 @@ class DataManager:
                     self.logger.warning(f"Attempt {attempt+1} failed. Retrying in {delay} seconds...")
                     time.sleep(delay)
                 else:
+                    self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")

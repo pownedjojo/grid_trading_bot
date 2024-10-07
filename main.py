@@ -1,5 +1,5 @@
 import argparse, logging, traceback
-from core.services.data_manager import DataManager
+from core.services.exchange_service import ExchangeService
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
@@ -9,7 +9,7 @@ from core.order_handling.fee_calculator import FeeCalculator
 from core.order_handling.balance_tracker import BalanceTracker
 from core.order_handling.order_book import OrderBook
 from core.grid_management.grid_manager import GridManager
-from core.services.exceptions import UnsupportedExchangeError, DataFetchError
+from core.services.exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
@@ -29,7 +29,7 @@ class GridTradingBot:
             self.logger.info("Starting Grid Trading Bot")
             
             self.order_book = OrderBook()
-            self.data_manager = DataManager(self.config_manager)
+            self.data_manager = ExchangeService(self.config_manager)
             self.grid_manager = GridManager(self.config_manager)
             self.transaction_validator = TransactionValidator()
             self.fee_calculator = FeeCalculator(self.config_manager)
@@ -52,7 +52,7 @@ class GridTradingBot:
             performance_summary = strategy.generate_performance_report()
         except ConfigError as e:
             self.handle_config_error(e)
-        except (UnsupportedExchangeError, DataFetchError) as e:
+        except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
             self.handle_data_manager_error(e)
         except Exception as e:
             self.handle_general_error(e)

@@ -11,21 +11,22 @@ class ConfigValidator:
         missing_fields += self._validate_required_fields(config)
         invalid_fields += self._validate_exchange(config)
         missing_fields += self._validate_pair(config)
-        invalid_fields += self._validate_timeframe(config)
-        missing_fields += self._validate_period(config)
-        grid_missing, grid_invalid = self._validate_grid_settings(config)
-        missing_fields += grid_missing
-        invalid_fields += grid_invalid
+        missing_trading_settings, invalid_trading_settings = self._validate_trading_settings(config)
+        missing_fields += missing_trading_settings
+        invalid_fields += invalid_trading_settings
+        missing_grid_settings, invalid_grid_settings = self._validate_grid_strategy(config)
+        missing_fields += missing_grid_settings
+        invalid_fields += invalid_grid_settings
         invalid_fields += self._validate_limits(config)
-        logging_missing, logging_invalid = self._validate_logging(config)
-        missing_fields += logging_missing
-        invalid_fields += logging_invalid
+        missing_logging_settings, invalid_logging_settings = self._validate_logging(config)
+        missing_fields += missing_logging_settings
+        invalid_fields += invalid_logging_settings
 
         if missing_fields or invalid_fields:
             raise ConfigValidationError(missing_fields=missing_fields, invalid_fields=invalid_fields)
 
     def _validate_required_fields(self, config):
-        required_fields = ['exchange', 'pair', 'timeframe', 'period', 'initial_balance', 'grid', 'limits', 'logging']
+        required_fields = ['exchange', 'pair', 'trading_settings', 'grid_strategy', 'risk_management', 'logging']
         missing_fields = [field for field in required_fields if field not in config]
         if missing_fields:
             self.logger.error(f"Missing required fields: {missing_fields}")
@@ -60,64 +61,97 @@ class ConfigValidator:
         
         return missing_fields
 
-    def _validate_timeframe(self, config):
+    def _validate_trading_settings(self, config):
+        missing_fields = []
         invalid_fields = []
-        valid_timeframes = ['1m', '5m', '15m', '1h', '1d']
-        timeframe = config.get('timeframe', None)
-        
+        trading_settings = config.get('trading_settings', {})
+
+        if not trading_settings.get('initial_balance'):
+            missing_fields.append('trading_settings.initial_balance')
+
+        # Validate timeframe
+        timeframe = trading_settings.get('timeframe')
+        valid_timeframes = ['1s', '1m', '3m', '5m', '15m', '30m', '1h', '2h', '6h', '12h', '1d', '1w', '1M']
         if timeframe not in valid_timeframes:
             self.logger.error(f"Invalid timeframe: {timeframe}. Must be one of {valid_timeframes}.")
-            invalid_fields.append('timeframe')
+            invalid_fields.append('trading_settings.timeframe')
 
-        return invalid_fields
-
-    def _validate_period(self, config):
-        missing_fields = []
-        period = config.get('period', {})
+        # Validate period
+        period = trading_settings.get('period', {})
         start_date = period.get('start_date')
         end_date = period.get('end_date')
 
         if not start_date:
-            missing_fields.append('period.start_date')
+            missing_fields.append('trading_settings.period.start_date')
         if not end_date:
-            missing_fields.append('period.end_date')
+            missing_fields.append('trading_settings.period.end_date')
 
-        if missing_fields:
-            self.logger.error(f"Missing period fields: {missing_fields}")
-        
-        return missing_fields
+        return missing_fields, invalid_fields
 
-    def _validate_grid_settings(self, config):
+    def _validate_grid_strategy(self, config):
         missing_fields = []
         invalid_fields = []
-        grid = config.get('grid', {})
+        grid = config.get('grid_strategy', {})
 
         if grid.get('num_grids') is None:
-            missing_fields.append('grid.num_grids')
-        if grid.get('top_range') is None:
-            missing_fields.append('grid.top_range')
-        if grid.get('bottom_range') is None:
-            missing_fields.append('grid.bottom_range')
+            missing_fields.append('grid_strategy.num_grids')
 
-        if grid.get('spacing_type') not in ['arithmetic', 'geometric']:
+        range_ = grid.get('range', {})
+        if range_.get('top') is None:
+            missing_fields.append('grid_strategy.range.top')
+        if range_.get('bottom') is None:
+            missing_fields.append('grid_strategy.range.bottom')
+        
+        top = grid.get('range', {}).get('top')
+        bottom = grid.get('range', {}).get('bottom')
+        if top is not None and bottom is not None and bottom >= top:
+            self.logger.error("Bottom range must be less than top range.")
+            invalid_fields.append('grid_strategy.range.top')
+            invalid_fields.append('grid_strategy.range.bottom')
+
+        spacing = grid.get('spacing', {})
+        if spacing.get('type') not in ['arithmetic', 'geometric']:
             self.logger.error("Grid spacing_type must be either 'arithmetic' or 'geometric'.")
-            invalid_fields.append('grid.spacing_type')
+            invalid_fields.append('grid_strategy.spacing.type')
+
+        if spacing.get('type') == 'arithmetic' and spacing.get('fixed_spacing') is None:
+            missing_fields.append('grid_strategy.spacing.fixed_spacing')
+
+        if spacing.get('type') == 'geometric' and spacing.get('percentage_spacing') is None:
+            missing_fields.append('grid_strategy.spacing.percentage_spacing')
+        
+        trade_percentage = grid.get('trade_percentage')
+        if trade_percentage is None:
+            missing_fields.append('grid_strategy.trade_percentage')
+        elif not (0 <= trade_percentage <= 1):
+            self.logger.error("Trade percentage must be between 0 and 1.")
+            invalid_fields.append('grid_strategy.trade_percentage')
 
         return missing_fields, invalid_fields
 
     def _validate_limits(self, config):
         invalid_fields = []
-        limits = config.get('limits', {})
+        limits = config.get('risk_management', {})
         take_profit = limits.get('take_profit', {})
         stop_loss = limits.get('stop_loss', {})
 
-        if not isinstance(take_profit.get('is_active'), bool):
-            self.logger.error("Take profit is_active flag must be a boolean.")
-            invalid_fields.append('limits.take_profit.is_active')
+        # Validate take profit
+        if not isinstance(take_profit.get('enabled'), bool):
+            self.logger.error("Take profit enabled flag must be a boolean.")
+            invalid_fields.append('risk_management.take_profit.enabled')
 
-        if not isinstance(stop_loss.get('is_active'), bool):
-            self.logger.error("Stop loss is_active flag must be a boolean.")
-            invalid_fields.append('limits.stop_loss.is_active')
+        if take_profit.get('threshold') is None or not isinstance(take_profit.get('threshold'), (float, int)):
+            self.logger.error("Invalid or missing take profit threshold.")
+            invalid_fields.append('risk_management.take_profit.threshold')
+
+        # Validate stop loss
+        if not isinstance(stop_loss.get('enabled'), bool):
+            self.logger.error("Stop loss enabled flag must be a boolean.")
+            invalid_fields.append('risk_management.stop_loss.enabled')
+
+        if stop_loss.get('threshold') is None or not isinstance(stop_loss.get('threshold'), (float, int)):
+            self.logger.error("Invalid or missing stop loss threshold.")
+            invalid_fields.append('risk_management.stop_loss.threshold')
 
         return invalid_fields
 
@@ -126,6 +160,7 @@ class ConfigValidator:
         invalid_fields = []
         logging_settings = config.get('logging', {})
 
+        # Validate log level
         log_level = logging_settings.get('log_level')
         valid_log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
         if log_level is None:
@@ -133,6 +168,15 @@ class ConfigValidator:
         elif log_level.upper() not in valid_log_levels:
             self.logger.error(f"Invalid log level: {log_level}. Must be one of {valid_log_levels}.")
             invalid_fields.append('logging.log_level')
+
+        # Validate log to file
+        if not isinstance(logging_settings.get('log_to_file'), bool):
+            self.logger.error("log_to_file must be a boolean.")
+            invalid_fields.append('logging.log_to_file')
+
+        # Validate log file path
+        if logging_settings.get('log_to_file') and not logging_settings.get('log_file_path'):
+            missing_fields.append('logging.log_file_path')
 
         if missing_fields:
             self.logger.error(f"Missing logging fields: {missing_fields}")

@@ -58,11 +58,11 @@ class GridTradingStrategy(TradingStrategy):
         if self.balance_tracker.crypto_balance == 0:
             return False
 
-        if self.config_manager.is_take_profit_active() and current_price >= self.config_manager.get_take_profit_threshold():
+        if self.config_manager.is_take_profit_enabled() and current_price >= self.config_manager.get_take_profit_threshold():
             self.order_manager.execute_take_profit_or_stop_loss_order(current_price=current_price, timestamp=current_timestamp, take_profit_order=True)
             return True
 
-        if self.config_manager.is_stop_loss_active() and current_price <= self.config_manager.get_stop_loss_threshold():
+        if self.config_manager.is_stop_loss_enabled() and current_price <= self.config_manager.get_stop_loss_threshold():
             self.order_manager.execute_take_profit_or_stop_loss_order(current_price=current_price, timestamp=current_timestamp, stop_loss_order=True)
             return True
 

@@ -47,12 +47,17 @@ class ConfigManager:
     def get_quote_currency(self):
         pair = self.get_pair()
         return pair.get('quote_currency', None)
+    
+    def get_trading_settings(self):
+        return self.config.get('trading_settings', {})
 
     def get_timeframe(self):
-        return self.config.get('timeframe', '1h')
+        trading_settings = self.get_trading_settings()
+        return trading_settings.get('timeframe', '1h')
 
     def get_period(self):
-        return self.config.get('period', {})
+        trading_settings = self.get_trading_settings()
+        return trading_settings.get('period', {})
     
     def get_start_date(self):
         period = self.get_period()
@@ -63,7 +68,8 @@ class ConfigManager:
         return period.get('end_date', None)
 
     def get_initial_balance(self):
-        return self.config.get('initial_balance', 10000)
+        trading_settings = self.get_trading_settings()
+        return trading_settings.get('initial_balance', 10000)
 
     def get_logging_level(self):
         log_level = self.config.get('logging', {}).get('log_level', 'INFO')
@@ -71,59 +77,84 @@ class ConfigManager:
 
     # --- Grid Accessor Methods ---
     def get_grid_settings(self):
-        return self.config.get('grid', {})
+        return self.config.get('grid_strategy', {})
 
     def get_num_grids(self):
         grid_settings = self.get_grid_settings()
         return grid_settings.get('num_grids', None)
+    
+    def get_grid_range(self):
+        grid_settings = self.get_grid_settings()
+        return grid_settings.get('range', {})
 
     def get_top_range(self):
-        grid_settings = self.get_grid_settings()
-        return grid_settings.get('top_range', None)
+        grid_range = self.get_grid_range()
+        return grid_range.get('top', None)
 
     def get_bottom_range(self):
-        grid_settings = self.get_grid_settings()
-        return grid_settings.get('bottom_range', None)
-
-    def get_spacing_type(self):
-        grid_settings = self.get_grid_settings()
-        return grid_settings.get('spacing_type', None)
-
+        grid_range = self.get_grid_range()
+        return grid_range.get('bottom', None)
+    
     def get_grid_spacing(self):
         grid_settings = self.get_grid_settings()
-        return grid_settings.get('grid_spacing', None)
+        return grid_settings.get('spacing', {})
+
+    def get_spacing_type(self):
+        grid_spacing = self.get_grid_spacing()
+        return grid_spacing.get('type', None)
 
     def get_percentage_spacing(self):
-        grid_settings = self.get_grid_settings()
-        return grid_settings.get('percentage_spacing', None)
+        grid_spacing = self.get_grid_spacing()
+        return grid_spacing.get('percentage_spacing', None)
+    
+    def get_fixed_spacing(self):
+        grid_spacing = self.get_grid_spacing()
+        return grid_spacing.get('fixed_spacing', None)
     
     def get_trade_percentage(self):
-        return self.config['grid'].get('trade_percentage', None)
+        grid_settings = self.get_grid_settings()
+        return grid_settings.get('trade_percentage', None)
 
-    # --- Limits (Take Profit / Stop Loss) Accessor Methods ---
-    def get_limits(self):
-        return self.config.get('limits', {})
+    # --- Risk management (Take Profit / Stop Loss) Accessor Methods ---
+    def get_risk_management(self):
+        return self.config.get('risk_management', {})
 
     def get_take_profit(self):
-        limits = self.get_limits()
-        return limits.get('take_profit', {})
+        risk_management = self.get_risk_management()
+        return risk_management.get('take_profit', {})
 
-    def is_take_profit_active(self):
+    def is_take_profit_enabled(self):
         take_profit = self.get_take_profit()
-        return take_profit.get('is_active', False)
+        return take_profit.get('enabled', False)
 
     def get_take_profit_threshold(self):
         take_profit = self.get_take_profit()
         return take_profit.get('threshold', None)
 
     def get_stop_loss(self):
-        limits = self.get_limits()
-        return limits.get('stop_loss', {})
+        risk_management = self.get_risk_management()
+        return risk_management.get('stop_loss', {})
 
-    def is_stop_loss_active(self):
+    def is_stop_loss_enabled(self):
         stop_loss = self.get_stop_loss()
-        return stop_loss.get('is_active', False)
+        return stop_loss.get('enabled', False)
 
     def get_stop_loss_threshold(self):
         stop_loss = self.get_stop_loss()
         return stop_loss.get('threshold', None)
+    
+    # --- Logging Accessor Methods ---
+    def get_logging(self):
+        return self.config.get('logging', {})
+    
+    def get_logging_level(self):
+        logging = self.get_logging()
+        return logging.get('log_level', {})
+    
+    def should_log_to_file(self):
+        logging = self.get_logging()
+        return logging.get('log_to_file', False)
+
+    def get_log_filename(self):
+        logging = self.get_logging()
+        return logging.get('log_filename', 'grid_trading_bot.log')

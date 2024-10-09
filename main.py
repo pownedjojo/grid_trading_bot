@@ -25,7 +25,7 @@ class GridTradingBot:
     def run(self):
         try:
             self.config_manager = self.initialize_config_manager()
-            setup_logging(self.config_manager.get_logging_level())
+            setup_logging(self.config_manager.get_logging_level(), self.config_manager.should_log_to_file(), self.config_manager.get_log_filename())
             self.logger.info("Starting Grid Trading Bot")
             
             self.order_book = OrderBook()
@@ -77,7 +77,7 @@ class GridTradingBot:
         exit(1)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Backtest Spot Grid Trading Strategy.")
+    parser = argparse.ArgumentParser(description="Spot Grid Trading Strategy.")
     parser.add_argument('--config', type=str, default='config/config.json', help='Path to config file.')
     args = parser.parse_args()
     

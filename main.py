@@ -19,7 +19,7 @@ class GridTradingBot:
     def __init__(self, config_path):
         self.config_path = config_path
         self.config_manager = None
-        self.data_manager = None
+        self.exchange_service = None
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def run(self):
@@ -29,7 +29,7 @@ class GridTradingBot:
             self.logger.info("Starting Grid Trading Bot")
             
             self.order_book = OrderBook()
-            self.data_manager = ExchangeService(self.config_manager)
+            self.exchange_service = ExchangeService(self.config_manager)
             self.grid_manager = GridManager(self.config_manager)
             self.transaction_validator = TransactionValidator()
             self.fee_calculator = FeeCalculator(self.config_manager)
@@ -39,7 +39,7 @@ class GridTradingBot:
             self.plotter = Plotter(self.grid_manager, self.order_book)
             strategy = GridTradingStrategy(
                 self.config_manager, 
-                self.data_manager, 
+                self.exchange_service, 
                 self.grid_manager, 
                 self.order_manager, 
                 self.balance_tracker, 
@@ -53,7 +53,7 @@ class GridTradingBot:
         except ConfigError as e:
             self.handle_config_error(e)
         except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
-            self.handle_data_manager_error(e)
+            self.handle_exchange_service_error(e)
         except Exception as e:
             self.handle_general_error(e)
 
@@ -67,8 +67,8 @@ class GridTradingBot:
         self.logger.error(f"Configuration error: {exception}")
         exit(1)
     
-    def handle_data_manager_error(self, exception):
-        self.logger.error(f"Data Manager error: {exception}")
+    def handle_exchange_service_error(self, exception):
+        self.logger.error(f"Exchange Service error: {exception}")
         exit(1)
 
     def handle_general_error(self, exception):

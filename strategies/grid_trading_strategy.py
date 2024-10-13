@@ -4,16 +4,16 @@ from .base import TradingStrategy
 from core.order_handling.order import OrderType
 
 class GridTradingStrategy(TradingStrategy):
-    def __init__(self, config_manager, data_manager, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter):
+    def __init__(self, config_manager, exchange_service, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter):
         super().__init__(config_manager, balance_tracker)
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.data_manager = data_manager
+        self.exchange_service = exchange_service
         self.grid_manager = grid_manager
         self.order_manager = order_manager
         self.trading_performance_analyzer = trading_performance_analyzer
         self.plotter = plotter
         pair, timeframe, start_date, end_date = self._extract_config()
-        self.data = self.data_manager.fetch_ohlcv(pair, timeframe, start_date, end_date)
+        self.data = self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
     
     def _extract_config(self):
         pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"

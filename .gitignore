@@ -34,6 +34,10 @@ pip-delete-this-directory.txt
 nosetests.xml
 coverage.xml
 
+# Ignore profiling output files
+*.prof
+profile_results.prof
+
 # VS Code
 .vscode/
 

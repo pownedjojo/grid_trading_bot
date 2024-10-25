@@ -8,25 +8,24 @@
     "quote_currency": "USDT"
   },
   "trading_settings": {
-    "timeframe": "1m",
+    "timeframe": "1h",
     "period": {
-      "start_date": "2024-07-04T00:00:00Z",
-      "end_date": "2024-07-11T00:00:00Z"
+      "start_date": "2024-07-24T00:00:00Z",
+      "end_date": "2024-10-01T00:00:00Z"
     },
     "initial_balance": 10000
   },
   "grid_strategy": {
     "num_grids": 20,
     "range": {
-      "top": 3100,
-      "bottom": 2850
+      "top": 3600,
+      "bottom": 3200
     },
     "spacing": {
       "type": "arithmetic",
-      "fixed_spacing": 200,
       "percentage_spacing": 0.05
     },
-    "trade_percentage": 0.1
+    "trade_percentage": 0.05
   },
   "risk_management": {
     "take_profit": {

@@ -9,6 +9,7 @@ class TestExchangeService:
     def config_manager(self):
         mock_config = Mock()
         mock_config.get_exchange_name.return_value = "binance"
+        mock_config.get_historical_data_file = Mock(return_value=None)
         return mock_config
 
     @pytest.fixture

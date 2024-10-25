@@ -1,4 +1,9 @@
-import argparse, logging, traceback
+import argparse, logging, traceback, cProfile, pstats, io, os, json
+from datetime import datetime, timedelta
+import pandas as pd
+from utils.arg_parser import parse_and_validate_console_args
+from utils.performance_results_saver import save_or_append_performance_results
+from concurrent.futures import ThreadPoolExecutor
 from core.services.exchange_service import ExchangeService
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
@@ -16,15 +21,15 @@ from config.exceptions import ConfigError
 from utils.logging_config import setup_logging
 
 class GridTradingBot:
-    def __init__(self, config_path):
+    def __init__(self, config_path, save_performance_results_path=None, no_plot=False):
         self.config_path = config_path
-        self.config_manager = None
-        self.exchange_service = None
+        self.save_performance_results_path = save_performance_results_path
+        self.no_plot = no_plot
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def run(self):
         try:
-            self.config_manager = self.initialize_config_manager()
+            self.config_manager = self._initialize_config_manager()
             setup_logging(self.config_manager.get_logging_level(), self.config_manager.should_log_to_file(), self.config_manager.get_log_filename())
             self.logger.info("Starting Grid Trading Bot")
             
@@ -48,38 +53,56 @@ class GridTradingBot:
             )
             strategy.initialize_strategy()
             strategy.simulate()
-            strategy.plot_results()
-            performance_summary = strategy.generate_performance_report()
-        except ConfigError as e:
-            self.handle_config_error(e)
-        except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
-            self.handle_exchange_service_error(e)
-        except Exception as e:
-            self.handle_general_error(e)
 
-    def initialize_config_manager(self):
+            if not self.no_plot:
+                strategy.plot_results()
+
+            performance_summary, formatted_orders = strategy.generate_performance_report()    
+            return {"config": self.config_path, "performance_summary": performance_summary, "orders": formatted_orders}
+        except ConfigError as e:
+            self._handle_config_error(e)
+        except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
+            self._handle_exchange_service_error(e)
+        except Exception as e:
+            self._handle_general_error(e)
+
+    def _initialize_config_manager(self):
         try:
             return ConfigManager(self.config_path, ConfigValidator())
         except ConfigError as e:
             raise e
 
-    def handle_config_error(self, exception):
+    def _handle_config_error(self, exception):
         self.logger.error(f"Configuration error: {exception}")
         exit(1)
     
-    def handle_exchange_service_error(self, exception):
+    def _handle_exchange_service_error(self, exception):
         self.logger.error(f"Exchange Service error: {exception}")
         exit(1)
 
-    def handle_general_error(self, exception):
+    def _handle_general_error(self, exception):
         self.logger.error(f"An unexpected error occurred: {exception}")
         self.logger.error(traceback.format_exc())
         exit(1)
 
+def run_bot_with_config(config_path, profile=False, save_performance_results_path=None, no_plot=False):
+    bot = GridTradingBot(config_path, save_performance_results_path, no_plot)
+
+    if profile:
+        cProfile.runctx("bot.run()", globals(), locals(), "profile_results.prof")
+        return None
+    else:
+        return bot.run()
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Spot Grid Trading Strategy.")
-    parser.add_argument('--config', type=str, default='config/config.json', help='Path to config file.')
-    args = parser.parse_args()
+    args = parse_and_validate_console_args()
     
-    bot = GridTradingBot(args.config)
-    bot.run()
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for config_path in args.config:
+            futures.append(executor.submit(run_bot_with_config, config_path, args.profile, args.save_performance_results, args.no_plot))
+        
+        for future in futures:
+            result = future.result()
+            if result and args.save_performance_results:
+                save_or_append_performance_results(result, args.save_performance_results)

@@ -48,15 +48,15 @@ class TestGridManager:
 
     def test_calculate_grids_and_central_price_geometric(self, config_manager):
         config_manager.get_spacing_type.return_value = 'geometric'
-        config_manager.get_bottom_range.return_value = 1000
         config_manager.get_top_range.return_value = 2000
+        config_manager.get_bottom_range.return_value = 1000
         config_manager.get_percentage_spacing.return_value = 0.05
         grid_manager = GridManager(config_manager)
 
-        expected_grids = [1000, 1050, 1102.5, 1157.625, 1215.50625, 1276.28156, 1340.09564, 1407.10043, 1477.45545, 1551.32822]
+        expected_grids = [1000, 1080.059738892306, 1166.5290395761165, 1259.921049894873, 1360.7900001743767, 1469.7344922755985, 1587.401051968199, 1714.4879657061451, 1851.7494245745802, 1999.999999999999]
         grids, central_price = grid_manager._calculate_grids_and_central_price()
         np.testing.assert_array_almost_equal(grids, expected_grids, decimal=5)
-        assert central_price == (2000 * 1000) ** 0.05
+        assert central_price == 1415.2622462249876
 
     def test_detect_grid_level_crossing_upward(self, grid_manager):
         grid_manager.sorted_sell_grids = [1500, 1600, 1700]

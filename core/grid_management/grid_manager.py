@@ -43,8 +43,17 @@ class GridManager:
             grids = np.linspace(bottom_range, top_range, num_grids)
             central_price = (top_range + bottom_range) / 2
         elif spacing_type == 'geometric':
-            grids = [bottom_range]
-            for _ in range(1, num_grids):
-                grids.append(grids[-1] * (1 + percentage_spacing))
-            central_price = (top_range * bottom_range) ** percentage_spacing
+            grids = []
+            ratio = (top_range / bottom_range) ** (1 / (num_grids - 1))
+            current_price = bottom_range
+
+            for _ in range(num_grids):
+                grids.append(current_price)
+                current_price *= ratio
+                
+            central_index = len(grids) // 2
+            if num_grids % 2 == 0:
+                central_price = (grids[central_index - 1] + grids[central_index]) / 2
+            else:
+                central_price = grids[central_index]
         return grids, central_price

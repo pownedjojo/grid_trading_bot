@@ -1,4 +1,4 @@
-import ccxt, logging, time
+import ccxt, logging, time, os
 import pandas as pd
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
@@ -8,6 +8,7 @@ class ExchangeService:
         self.config_manager = config_manager
         self.logger = logging.getLogger(__name__)
         self.exchange_name = self.config_manager.get_exchange_name()
+        self.historical_data_file = self.config_manager.get_historical_data_file()
         self.exchange = self._initialize_exchange()
 
     def _initialize_exchange(self):
@@ -25,6 +26,10 @@ class ExchangeService:
             return False
 
     def fetch_ohlcv(self, pair, timeframe, start_date, end_date):
+        if self.historical_data_file and os.path.exists(self.historical_data_file):
+            self.logger.info(f"Loading OHLCV data from file: {self.historical_data_file}")
+            return self._load_ohlcv_from_file(self.historical_data_file, start_date, end_date)
+
         if not self._is_timeframe_supported(timeframe):
             raise UnsupportedTimeframeError(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
 
@@ -45,6 +50,19 @@ class ExchangeService:
             raise DataFetchError(f"Exchange-specific error occurred: {str(e)}")
         except Exception as e:
             raise DataFetchError(f"Failed to fetch OHLCV data {str(e)}.")
+    
+    def _load_ohlcv_from_file(self, file_path, start_date, end_date):
+        try:
+            df = pd.read_csv(file_path, parse_dates=['timestamp'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df.set_index('timestamp', inplace=True)
+            start_timestamp = pd.to_datetime(start_date).tz_localize(None)
+            end_timestamp = pd.to_datetime(end_date).tz_localize(None)
+            filtered_df = df.loc[start_timestamp:end_timestamp]
+            self.logger.info(f"Loaded {len(filtered_df)} rows of OHLCV data from file.")
+            return filtered_df
+        except Exception as e:
+            raise DataFetchError(f"Failed to load OHLCV data from file: {str(e)}")
 
     def _fetch_ohlcv_single_batch(self, pair, timeframe, since, until):
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)

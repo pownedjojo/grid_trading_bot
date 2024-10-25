@@ -70,6 +70,10 @@ class ConfigManager:
     def get_initial_balance(self):
         trading_settings = self.get_trading_settings()
         return trading_settings.get('initial_balance', 10000)
+    
+    def get_historical_data_file(self):
+        trading_settings = self.get_trading_settings()
+        return trading_settings.get('historical_data_file', None)
 
     def get_logging_level(self):
         log_level = self.config.get('logging', {}).get('log_level', 'INFO')
@@ -106,10 +110,6 @@ class ConfigManager:
     def get_percentage_spacing(self):
         grid_spacing = self.get_grid_spacing()
         return grid_spacing.get('percentage_spacing', None)
-    
-    def get_fixed_spacing(self):
-        grid_spacing = self.get_grid_spacing()
-        return grid_spacing.get('fixed_spacing', None)
     
     def get_trade_percentage(self):
         grid_settings = self.get_grid_settings()

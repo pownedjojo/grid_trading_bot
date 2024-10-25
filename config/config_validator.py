@@ -114,9 +114,6 @@ class ConfigValidator:
             self.logger.error("Grid spacing_type must be either 'arithmetic' or 'geometric'.")
             invalid_fields.append('grid_strategy.spacing.type')
 
-        if spacing.get('type') == 'arithmetic' and spacing.get('fixed_spacing') is None:
-            missing_fields.append('grid_strategy.spacing.fixed_spacing')
-
         if spacing.get('type') == 'geometric' and spacing.get('percentage_spacing') is None:
             missing_fields.append('grid_strategy.spacing.percentage_spacing')
         

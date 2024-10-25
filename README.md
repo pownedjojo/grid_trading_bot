@@ -154,9 +154,35 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
 ## Running the Bot
 
 To run the bot, use the following command:
-```sh 
+
+### Basic Usage:
+  ```sh
   grid_trading_bot --config config/config.json
-```
+  ```
+
+### Multiple Configurations:
+If you want to run the bot with multiple configuration files simultaneously, you can specify them all:
+  ```sh
+  grid_trading_bot --config config/config1.json config/config2.json config/config3.json
+  ```
+
+### Saving Performance Results:
+To save the performance results to a file, use the **--save_performance_results** option:
+  ```sh
+  grid_trading_bot --config config/config.json --save_performance_results results.json
+  ```
+
+### Disabling Plots:
+To run the bot without displaying the end-of-simulation plots, use the **--no-plot** flag:
+  ```sh
+  grid_trading_bot --config config/config.json --no-plot
+  ```
+
+### Combining Options:
+You can combine multiple options to customize how the bot runs. For example:
+  ```sh
+  grid_trading_bot --config config/config1.json config/config2.json --save_performance_results combined_results.json --no-plot
+  ```
 
 ## Contributing
 

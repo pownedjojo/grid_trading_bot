@@ -39,7 +39,7 @@ class GridTradingStrategy(TradingStrategy):
     
     def generate_performance_report(self):
         final_price = self.close_prices[-1]
-        self.trading_performance_analyzer.generate_performance_summary(
+        return self.trading_performance_analyzer.generate_performance_summary(
             self.data, 
             self.balance_tracker.balance, 
             self.balance_tracker.crypto_balance, 

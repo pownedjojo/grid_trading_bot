@@ -50,3 +50,4 @@ conda_packages.txt
 
 # Project specific
 grid_trading_bot.log
+/data/

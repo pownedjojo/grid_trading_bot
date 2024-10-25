@@ -28,7 +28,6 @@ def valid_config():
             },
             "spacing": {
             "type": "arithmetic",
-            "fixed_spacing": 200,
             "percentage_spacing": 0.05
             },
             "trade_percentage": 0.1

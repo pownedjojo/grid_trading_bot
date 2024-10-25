@@ -83,12 +83,6 @@ class TestConfigValidator:
             config_validator.validate(valid_config)
         assert 'grid_strategy.spacing.type' in excinfo.value.invalid_fields
 
-        # Test missing fixed_spacing when spacing type is 'arithmetic'
-        valid_config['grid_strategy']['spacing'] = {'type': 'arithmetic', 'fixed_spacing': None}
-        with pytest.raises(ConfigValidationError) as excinfo:
-            config_validator.validate(valid_config)
-        assert 'grid_strategy.spacing.fixed_spacing' in excinfo.value.missing_fields
-
         # Test missing percentage_spacing when spacing type is 'geometric'
         valid_config['grid_strategy']['spacing'] = {'type': 'geometric', 'percentage_spacing': None}
         with pytest.raises(ConfigValidationError) as excinfo:

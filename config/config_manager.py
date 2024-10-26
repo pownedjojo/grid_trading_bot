@@ -110,10 +110,6 @@ class ConfigManager:
     def get_percentage_spacing(self):
         grid_spacing = self.get_grid_spacing()
         return grid_spacing.get('percentage_spacing', None)
-    
-    def get_trade_percentage(self):
-        grid_settings = self.get_grid_settings()
-        return grid_settings.get('trade_percentage', None)
 
     # --- Risk management (Take Profit / Stop Loss) Accessor Methods ---
     def get_risk_management(self):

@@ -10,7 +10,6 @@ class OrderManager:
         self.transaction_validator = transaction_validator
         self.balance_tracker = balance_tracker
         self.order_book = order_book
-        self.trade_percentage = self.config_manager.get_trade_percentage()
 
     def execute_order(self, order_type: OrderType, current_price, previous_price, timestamp):
         grid_price = self.grid_manager.detect_grid_level_crossing(current_price, previous_price, sell=(order_type == OrderType.SELL))
@@ -35,7 +34,7 @@ class OrderManager:
     
     def _process_buy_order(self, grid_level, current_price, timestamp):
         try:
-            quantity = self.trade_percentage * self.balance_tracker.balance / current_price
+            quantity = self.grid_manager.get_order_size_per_grid(current_price)
             if quantity > 0:
                 self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
                 self._place_order(grid_level, OrderType.BUY, current_price, quantity, timestamp)

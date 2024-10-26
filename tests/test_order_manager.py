@@ -17,7 +17,6 @@ class TestOrderManager:
 
     @pytest.fixture
     def order_manager(self, mock_dependencies):
-        mock_dependencies['config_manager'].get_trade_percentage.return_value = 0.1
         return OrderManager(
             config_manager=mock_dependencies['config_manager'],
             grid_manager=mock_dependencies['grid_manager'],
@@ -39,6 +38,7 @@ class TestOrderManager:
         grid_level = Mock()
         mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
         mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        mock_dependencies['grid_manager'].get_order_size_per_grid.return_value = 1000
         mock_dependencies['balance_tracker'].balance = 10000
         
         order_manager.execute_order(OrderType.BUY, 1000, 900, "2024-01-01T00:00:00Z")
@@ -194,21 +194,10 @@ class TestOrderManager:
         grid_level = Mock()
         mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
         mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        mock_dependencies['grid_manager'].get_order_size_per_grid.return_value = 10000
         mock_dependencies['balance_tracker'].balance = 1000000  # Large balance for a large trade
         
         order_manager.execute_order(OrderType.BUY, 1000, 900, "2024-01-01T00:00:00Z")
         
         mock_dependencies['transaction_validator'].validate_buy_order.assert_called_once()
         mock_dependencies['balance_tracker'].update_after_buy.assert_called_once()
-    
-    def test_zero_trade_percentage(self, order_manager, mock_dependencies):
-        mock_dependencies['config_manager'].get_trade_percentage.return_value = 0  # 0% trade percentage
-        grid_level = Mock()
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
-        
-        order_manager.execute_order(OrderType.BUY, 1000, 900, "2024-01-01T00:00:00Z")
-        
-        # No order should be placed
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_not_called()
-        mock_dependencies['balance_tracker'].update_after_buy.assert_not_called()

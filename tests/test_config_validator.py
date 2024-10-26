@@ -89,12 +89,6 @@ class TestConfigValidator:
             config_validator.validate(valid_config)
         assert 'grid_strategy.spacing.percentage_spacing' in excinfo.value.missing_fields
 
-        # Test invalid trade_percentage
-        valid_config['grid_strategy']['trade_percentage'] = -0.5  # Invalid trade percentage
-        with pytest.raises(ConfigValidationError) as excinfo:
-            config_validator.validate(valid_config)
-        assert 'grid_strategy.trade_percentage' in excinfo.value.invalid_fields
-
     def test_validate_limits_invalid_type(self, config_validator, valid_config):
         valid_config['risk_management'] = {
             'take_profit': {'enabled': 'yes'},  # Invalid boolean

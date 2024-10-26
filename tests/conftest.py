@@ -29,8 +29,7 @@ def valid_config():
             "spacing": {
             "type": "arithmetic",
             "percentage_spacing": 0.05
-            },
-            "trade_percentage": 0.1
+            }
         },
         "risk_management": {
             "take_profit": {

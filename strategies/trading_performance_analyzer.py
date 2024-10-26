@@ -112,7 +112,9 @@ class TradingPerformanceAnalyzer:
         start_date = data.index[0]
         end_date = data.index[-1]
         duration = end_date - start_date
-        final_balance = balance + crypto_balance * final_crypto_price
+        final_fiat_balance = balance
+        final_crypto_value = crypto_balance * final_crypto_price
+        final_balance = final_fiat_balance + final_crypto_value
         roi = self._calculate_roi(final_balance)
         grid_trading_gains = self._calculate_trading_gains()
         max_drawdown = self._calculate_drawdown(data)
@@ -136,7 +138,10 @@ class TradingPerformanceAnalyzer:
             "Buy and Hold Return %": f"{buy_and_hold_return:.2f}%",
             "Grid Trading Gains": f"{grid_trading_gains:.2f}",
             "Total Fees": f"{total_fees:.2f}",
-            "Final Balance": f"{final_balance:.2f}",
+            "Final Balance (Fiat)": f"{final_balance:.2f}",
+            "Crypto Balance": f"{crypto_balance:.4f} {self.base_currency}",
+            "Final Crypto Value (Fiat)": f"{final_crypto_value:.2f} {self.quote_currency}",
+            "Remaining Fiat Balance": f"{final_fiat_balance:.2f} {self.quote_currency}",
             "Number of Buy Trades": num_buy_trades,
             "Number of Sell Trades": num_sell_trades,
             "Sharpe Ratio": f"{sharpe_ratio:.2f}",

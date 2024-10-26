@@ -4,6 +4,7 @@ from .grid_level import GridLevel, GridCycleState
 class GridManager:
     def __init__(self, config_manager):
         self.config_manager = config_manager
+        self.initial_balance = self.config_manager.get_initial_balance()
         self.grids, self.central_price = self._calculate_grids_and_central_price()
         self.sorted_buy_grids = [grid for grid in self.grids if grid <= self.central_price]
         self.sorted_sell_grids = [grid for grid in self.grids if grid > self.central_price]
@@ -29,7 +30,12 @@ class GridManager:
                 return grid_level
         return None
 
-    def _extract_config(self):
+    def get_order_size_per_grid(self, current_price):
+        total_grids = len(self.grid_levels)
+        order_size = self.initial_balance / total_grids / current_price
+        return order_size
+
+    def _extract_grid_config(self):
         bottom_range = self.config_manager.get_bottom_range()
         top_range = self.config_manager.get_top_range()
         num_grids = self.config_manager.get_num_grids()
@@ -38,7 +44,7 @@ class GridManager:
         return bottom_range, top_range, num_grids, spacing_type, percentage_spacing
 
     def _calculate_grids_and_central_price(self):
-        bottom_range, top_range, num_grids, spacing_type, percentage_spacing = self._extract_config()
+        bottom_range, top_range, num_grids, spacing_type, percentage_spacing = self._extract_grid_config()
         if spacing_type == 'arithmetic':
             grids = np.linspace(bottom_range, top_range, num_grids)
             central_price = (top_range + bottom_range) / 2

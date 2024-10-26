@@ -116,13 +116,6 @@ class ConfigValidator:
 
         if spacing.get('type') == 'geometric' and spacing.get('percentage_spacing') is None:
             missing_fields.append('grid_strategy.spacing.percentage_spacing')
-        
-        trade_percentage = grid.get('trade_percentage')
-        if trade_percentage is None:
-            missing_fields.append('grid_strategy.trade_percentage')
-        elif not (0 <= trade_percentage <= 1):
-            self.logger.error("Trade percentage must be between 0 and 1.")
-            invalid_fields.append('grid_strategy.trade_percentage')
 
         return missing_fields, invalid_fields
 

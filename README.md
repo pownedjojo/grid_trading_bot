@@ -85,37 +85,43 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
     "trading_fee": 0.001
   },
   "pair": {
-    "base_currency": "ETH",
+    "base_currency": "SOL",
     "quote_currency": "USDT"
   },
-  "timeframe": "1h",
-  "period": {
-    "start_date": "2024-06-01T00:00:00Z",
-    "end_date": "2024-06-30T00:00:00Z"
+  "trading_settings": {
+    "timeframe": "1m",
+    "period": {
+      "start_date": "2024-08-01T00:00:00Z",
+      "end_date": "2024-10-20T00:00:00Z"
+    },
+    "initial_balance": 10000,
+    "historical_data_file": "data/SOL_USDT/2024/1m.csv"
   },
-  "initial_balance": 10000,
-  "take_profit": {
-    "is_active": true,
-    "threshold": 3700
+  "grid_strategy": {
+    "num_grids": 15,
+    "range": {
+      "top": 130,
+      "bottom": 120
+    },
+    "spacing": {
+      "type": "geometric",
+      "percentage_spacing": 0.05
+    }
   },
-  "stop_loss": {
-    "is_active": true,
-    "threshold": 3100
-  },
-  "grid": {
-    "num_grids": 20,
-    "top_range": 3600,
-    "bottom_range": 3200,
-    "spacing_type": "arithmetic",
-    "grid_spacing": 200,
-    "percentage_spacing": 0.05,
-    "trade_percentage": 0.1
-  },
-  "limits": {
-    "max_orders": 10
+  "risk_management": {
+    "take_profit": {
+      "enabled": false,
+      "threshold": 200
+    },
+    "stop_loss": {
+      "enabled": false,
+      "threshold": 110
+    }
   },
   "logging": {
-    "log_level": "INFO"
+    "log_level": "INFO",
+    "log_to_file": true,
+    "log_file_path": "logs/trading_SOL_120_130.log"
   }
 }
 ```
@@ -125,31 +131,41 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
 - **exchange**: Defines the exchange and trading fee to be used.
   - **name**: The name of the exchange (e.g., binance).
   - **trading_fee**: The trading fee should be in decimal format (e.g., 0.001 for 0.1%).
+
 - **pair**: Specifies the trading pair.
   - **base_currency**: The base currency (e.g., ETH).
   - **quote_currency**: The quote currency (e.g., USDT).
-- **timeframe**: Time interval for the data (e.g., 1h for one hour).
-- **period**: The start and end dates for the backtest or trading period.
-  - **start_date**: The start date of the trading or backtest period.
-  - **end_date**: The end date of the trading or backtest period.
-- **initial_balance**: Starting balance for the bot.
-- **grid**: Defines the grid trading parameters.
+
+- **trading_settings**: General trading settings.
+  - **timeframe**: Time interval for the data (e.g., `1m` for one minute).
+  - **period**: The start and end dates for the backtest or trading period.
+    - **start_date**: The start date of the trading or backtest period.
+    - **end_date**: The end date of the trading or backtest period.
+  - **initial_balance**: Starting balance for the bot.
+  - **historical_data_file**: Path to a local historical data file for offline testing (optional).
+
+- **grid_strategy**: Defines the grid trading parameters.
   - **num_grids**: The number of grid levels.
-  - **top_range**: The upper price limit of the grid.
-  - **bottom_range**: The lower price limit of the grid.
-  - **spacing_type**: The type of spacing (arithmetic or geometric).
-  - **grid_spacing**: The spacing between grids (used for arithmetic spacing).
-  - **percentage_spacing**: The percentage spacing between grids (used for geometric spacing).
-  - **trade_percentage**: The percentage of available balance used to place each trade (e.g., 0.1 for 10%).
-- **limits**: Configurations for risk management.
+  - **range**: Defines the price range of the grid.
+    - **top**: The upper price limit of the grid.
+    - **bottom**: The lower price limit of the grid.
+  - **spacing**: Defines the grid spacing type and parameters.
+    - **type**: Type of spacing (`arithmetic` or `geometric`).
+    - **grid_spacing**: The spacing between grids (used for arithmetic spacing).
+    - **percentage_spacing**: Percentage spacing between grids (used for geometric spacing).
+  
+- **risk_management**: Configurations for risk management.
   - **take_profit**: Settings for taking profit.
-    - **is_active**: Whether the take profit is active.
+    - **enabled**: Whether the take profit is active.
     - **threshold**: The price at which to take profit.
   - **stop_loss**: Settings for stopping loss.
-    - **is_active**: Whether the stop loss is active.
+    - **enabled**: Whether the stop loss is active.
     - **threshold**: The price at which to stop loss.
-- **logging**: Configures logging.
-  - **log_level**: The level of logging (e.g., INFO, DEBUG).
+
+- **logging**: Configures logging settings.
+  - **log_level**: The logging level (e.g., `INFO`, `DEBUG`).
+  - **log_to_file**: Enables logging to a file.
+  - **log_file_path**: The file path for log storage.
 
 ## Running the Bot
 

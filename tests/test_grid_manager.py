@@ -8,6 +8,7 @@ class TestGridManager:
     @pytest.fixture
     def config_manager(self):
         mock_config_manager = Mock()
+        mock_config_manager.get_initial_balance.return_value = 10000
         mock_config_manager.get_bottom_range.return_value = 1000
         mock_config_manager.get_top_range.return_value = 2000
         mock_config_manager.get_num_grids.return_value = 10
@@ -134,3 +135,11 @@ class TestGridManager:
         grid_manager.initialize_grid_levels()
         lowest_completed_grid = grid_manager.find_lowest_completed_buy_grid()
         assert lowest_completed_grid is None
+    
+    def test_get_order_size_per_grid(self, grid_manager):
+        grid_manager.grid_levels = [1, 2, 3, 4, 5]
+        grid_manager.initial_balance = 10000
+        current_price = 200
+        expected_order_size = 10000 / len(grid_manager.grid_levels) / current_price
+        result = grid_manager.get_order_size_per_grid(current_price)
+        assert result == expected_order_size

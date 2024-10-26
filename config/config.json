@@ -16,16 +16,15 @@
     "initial_balance": 10000
   },
   "grid_strategy": {
-    "num_grids": 20,
+    "num_grids": 10,
     "range": {
       "top": 3600,
-      "bottom": 3200
+      "bottom": 3300
     },
     "spacing": {
       "type": "arithmetic",
       "percentage_spacing": 0.05
-    },
-    "trade_percentage": 0.05
+    }
   },
   "risk_management": {
     "take_profit": {

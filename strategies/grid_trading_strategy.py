@@ -1,6 +1,7 @@
 import logging, itertools
 import numpy as np
 from .base import TradingStrategy
+from config.trading_modes import TradingMode
 from core.order_handling.order import OrderType
 
 class GridTradingStrategy(TradingStrategy):
@@ -12,8 +13,11 @@ class GridTradingStrategy(TradingStrategy):
         self.order_manager = order_manager
         self.trading_performance_analyzer = trading_performance_analyzer
         self.plotter = plotter
-        pair, timeframe, start_date, end_date = self._extract_config()
-        self.data = self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
+        self.trading_mode = self.config_manager.get_trading_mode()
+        
+        if self.trading_mode == TradingMode.BACKTEST:
+            pair, timeframe, start_date, end_date = self._extract_config()
+            self.data = self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
     
     def _extract_config(self):
         pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
@@ -25,12 +29,21 @@ class GridTradingStrategy(TradingStrategy):
     def initialize_strategy(self):
         self.grid_manager.initialize_grid_levels()
 
-    def simulate(self):
-        self.logger.info("Start trading simulation")
+    def run(self):
+        if self.trading_mode == TradingMode.BACKTEST:
+            self._simulate_backtest()
+        else:
+            self._run_live_or_paper_trading()
+    
+    def _run_live_or_paper_trading(self):
+        self.logger.info(f"Starting {'live' if self.trading_mode == TradingMode.LIVE else 'paper'} trading")
+        ## TODO
+
+    def _simulate_backtest(self):
+        self.logger.info("Starting backtest simulation")
         self.data['account_value'] = np.nan
         self.close_prices = self.data['close'].values
         timestamps = self.data.index
-
         for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), timestamps[1:]):
             if self._check_take_profit_stop_loss(current_price, current_timestamp):
                 break
@@ -48,7 +61,10 @@ class GridTradingStrategy(TradingStrategy):
         )
 
     def plot_results(self):
-        self.plotter.plot_results(self.data)
+        if self.trading_mode == TradingMode.BACKTEST:
+            self.plotter.plot_results(self.data)
+        else:
+            self.logger.info("Plotting is not available for live/paper trading mode.")
     
     def _execute_orders(self, current_price, previous_price, current_timestamp):
         self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)

@@ -1,4 +1,6 @@
 import json, os, logging
+from typing import Optional
+from .trading_modes import TradingMode
 from .exceptions import ConfigFileNotFoundError, ConfigParseError
 
 class ConfigManager:
@@ -36,6 +38,14 @@ class ConfigManager:
     def get_trading_fee(self):
         exchange = self.get_exchange()
         return exchange.get('trading_fee', 0)
+    
+    def get_trading_mode(self) -> Optional[TradingMode]:
+        exchange = self.get_exchange()
+        trading_mode = exchange.get('trading_mode', None)
+        
+        if trading_mode:
+            return TradingMode.from_string(trading_mode)
+        return None
 
     def get_pair(self):
         return self.config.get('pair', {})

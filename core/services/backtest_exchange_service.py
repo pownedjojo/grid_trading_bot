@@ -1,16 +1,22 @@
 import ccxt, logging, time, os
 import pandas as pd
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
+from .exchange_interface import ExchangeInterface
 from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 
-class ExchangeService:
+class BacktestExchangeService(ExchangeInterface):
     def __init__(self, config_manager):
         self.config_manager = config_manager
         self.logger = logging.getLogger(__name__)
-        self.exchange_name = self.config_manager.get_exchange_name()
         self.historical_data_file = self.config_manager.get_historical_data_file()
+        self.exchange_name = self.config_manager.get_exchange_name()
         self.exchange = self._initialize_exchange()
 
+        ## ADDED: TO CHECK
+        self.initial_balance = self.config_manager.get_initial_balance()
+        self.fiat_balance = self.initial_balance
+        self.crypto_balance = 0
+    
     def _initialize_exchange(self):
         try:
             return getattr(ccxt, self.exchange_name)()
@@ -24,6 +30,21 @@ class ExchangeService:
         else:
             self.logger.warning(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
             return False
+    
+    def get_balance(self):
+        ## SHOULD NOT BE CALLED ?
+        return {"fiat_balance": self.fiat_balance, "crypto_balance": self.crypto_balance}
+
+    def place_order(self, pair, order_type, amount, price=None):
+        self.logger.info(f"Simulating {order_type} order: {amount} {pair} at price {price}")
+        return {
+            'id': f"backtest-{int(time.time())}",
+            'pair': pair,
+            'type': order_type,
+            'amount': amount,
+            'price': price,
+            'status': 'filled'
+        }
 
     def fetch_ohlcv(self, pair, timeframe, start_date, end_date):
         if self.historical_data_file and os.path.exists(self.historical_data_file):
@@ -103,3 +124,12 @@ class ExchangeService:
                 else:
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
+
+    def get_current_price(self, pair):
+        pass
+
+    def get_order_status(self, order_id):
+        pass
+
+    def cancel_order(self, order_id):
+        pass

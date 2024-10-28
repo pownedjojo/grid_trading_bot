@@ -3,7 +3,7 @@ import pandas as pd
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
 from concurrent.futures import ThreadPoolExecutor
-from core.services.exchange_service import ExchangeService
+from core.services.exchange_service_factory import ExchangeServiceFactory
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
@@ -17,6 +17,7 @@ from core.services.exceptions import UnsupportedExchangeError, DataFetchError, U
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
+from config.trading_modes import TradingMode
 from utils.logging_config import setup_logging
 
 class GridTradingBot:
@@ -30,17 +31,21 @@ class GridTradingBot:
         try:
             self.config_manager = self._initialize_config_manager()
             setup_logging(self.config_manager.get_logging_level(), self.config_manager.should_log_to_file(), self.config_manager.get_log_filename())
-            self.logger.info("Starting Grid Trading Bot")
-            
+            trading_mode = self.config_manager.get_trading_mode()
+            self.logger.info(f"Starting Grid Trading Bot in {trading_mode.value} mode")
             self.order_book = OrderBook()
-            self.exchange_service = ExchangeService(self.config_manager)
+            self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, trading_mode)
             self.grid_manager = GridManager(self.config_manager)
             self.transaction_validator = TransactionValidator()
             self.fee_calculator = FeeCalculator(self.config_manager)
             self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
             self.order_manager = OrderManager(self.config_manager, self.grid_manager, self.transaction_validator, self.balance_tracker, self.order_book)
             self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
-            self.plotter = Plotter(self.grid_manager, self.order_book)
+            self.plotter = None
+
+            if trading_mode == TradingMode.BACKTEST:
+                self.plotter = Plotter(self.grid_manager, self.order_book)
+
             strategy = GridTradingStrategy(
                 self.config_manager, 
                 self.exchange_service, 
@@ -51,13 +56,19 @@ class GridTradingBot:
                 self.plotter
             )
             strategy.initialize_strategy()
-            strategy.simulate()
-
-            if not self.no_plot:
+            strategy.run()
+            
+            if trading_mode == TradingMode.BACKTEST and not self.no_plot:
                 strategy.plot_results()
+            
+            performance_summary, formatted_orders = strategy.generate_performance_report()
+            if trading_mode == TradingMode.LIVE:
+                self.logger.info("Live trading session completed. Performance data available.")
+            elif trading_mode == TradingMode.PAPER_TRADING:
+                self.logger.info("Paper trading session completed. Review the performance summary.")
+            else:
+                return {"config": self.config_path, "performance_summary": performance_summary, "orders": formatted_orders}
 
-            performance_summary, formatted_orders = strategy.generate_performance_report()    
-            return {"config": self.config_path, "performance_summary": performance_summary, "orders": formatted_orders}
         except ConfigError as e:
             self._handle_config_error(e)
         except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:

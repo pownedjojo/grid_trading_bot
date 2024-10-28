@@ -1,4 +1,5 @@
 import logging
+from .trading_modes import TradingMode
 from .exceptions import ConfigValidationError
 
 class ConfigValidator:
@@ -44,6 +45,15 @@ class ConfigValidator:
         if trading_fee is None or not isinstance(trading_fee, (float, int)) or trading_fee < 0:
             self.logger.error("Invalid or missing trading fee.")
             invalid_fields.append('exchange.trading_fee')
+        
+        trading_mode_str = exchange.get('trading_mode')
+        if not trading_mode_str:
+            invalid_fields.append('exchange.trading_mode')
+        else:
+            try:
+                TradingMode.from_string(trading_mode_str)
+            except ValueError as e:
+                invalid_fields.append('exchange.trading_mode')
 
         return invalid_fields
 

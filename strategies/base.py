@@ -27,9 +27,9 @@ class TradingStrategy(ABC):
         pass
 
     @abstractmethod
-    def simulate(self):
+    def run(self):
         """
-        Simulates the strategy with historical or live data.
+        Run the strategy with historical or live data.
         Must be implemented by any subclass.
         """
         pass

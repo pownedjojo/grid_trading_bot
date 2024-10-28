@@ -1,4 +1,5 @@
 import ccxt, logging, time, os
+from typing import Optional, Dict, Any
 import pandas as pd
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
@@ -17,36 +18,27 @@ class BacktestExchangeService(ExchangeInterface):
         self.fiat_balance = self.initial_balance
         self.crypto_balance = 0
     
-    def _initialize_exchange(self):
+    def _initialize_exchange(self) -> Optional[ccxt.Exchange]:
         try:
             return getattr(ccxt, self.exchange_name)()
         except AttributeError:
             raise UnsupportedExchangeError(f"The exchange '{self.exchange_name}' is not supported.")
     
-    def _is_timeframe_supported(self, timeframe):
-        supported_timeframes = self.exchange.timeframes
-        if timeframe in supported_timeframes:
-            return True
-        else:
+    def _is_timeframe_supported(self, timeframe: str) -> bool:
+        if timeframe not in self.exchange.timeframes:
             self.logger.warning(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
             return False
+        return True
     
     def get_balance(self):
-        ## SHOULD NOT BE CALLED ?
+        ## TODO: SHOULD NOT BE CALLED ?
         return {"fiat_balance": self.fiat_balance, "crypto_balance": self.crypto_balance}
 
     def place_order(self, pair, order_type, amount, price=None):
         self.logger.info(f"Simulating {order_type} order: {amount} {pair} at price {price}")
-        return {
-            'id': f"backtest-{int(time.time())}",
-            'pair': pair,
-            'type': order_type,
-            'amount': amount,
-            'price': price,
-            'status': 'filled'
-        }
+        return {'id': f"backtest-{int(time.time())}", 'pair': pair, 'type': order_type, 'amount': amount, 'price': price, 'status': 'filled'}
 
-    def fetch_ohlcv(self, pair, timeframe, start_date, end_date):
+    def fetch_ohlcv(self, pair, timeframe, start_date, end_date) -> pd.DataFrame:
         if self.historical_data_file and os.path.exists(self.historical_data_file):
             self.logger.info(f"Loading OHLCV data from file: {self.historical_data_file}")
             return self._load_ohlcv_from_file(self.historical_data_file, start_date, end_date)
@@ -72,7 +64,7 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to fetch OHLCV data {str(e)}.")
     
-    def _load_ohlcv_from_file(self, file_path, start_date, end_date):
+    def _load_ohlcv_from_file(self, file_path, start_date, end_date) -> pd.DataFrame:
         try:
             df = pd.read_csv(file_path, parse_dates=['timestamp'])
             df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -85,11 +77,11 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to load OHLCV data from file: {str(e)}")
 
-    def _fetch_ohlcv_single_batch(self, pair, timeframe, since, until):
+    def _fetch_ohlcv_single_batch(self, pair, timeframe, since, until) -> pd.DataFrame:
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)
         return self._format_ohlcv(ohlcv, until)
 
-    def _fetch_ohlcv_in_chunks(self, pair, timeframe, since, until, candles_per_request):
+    def _fetch_ohlcv_in_chunks(self, pair, timeframe, since, until, candles_per_request) -> pd.DataFrame:
         all_ohlcv = []
         while since < until:
             ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since, limit=candles_per_request)
@@ -100,17 +92,17 @@ class BacktestExchangeService(ExchangeInterface):
             self.logger.info(f"Fetched up to {pd.to_datetime(since, unit='ms')}")
         return self._format_ohlcv(all_ohlcv, until)
 
-    def _format_ohlcv(self, ohlcv, until):
+    def _format_ohlcv(self, ohlcv, until) -> pd.DataFrame:
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
         until_timestamp = pd.to_datetime(until, unit='ms')
         return df[df.index <= until_timestamp]
     
-    def _get_candle_limit(self):
+    def _get_candle_limit(self) -> int:
         return CANDLE_LIMITS.get(self.exchange_name, 500)  # Default to 500 if not found
 
-    def _get_timeframe_in_ms(self, timeframe):
+    def _get_timeframe_in_ms(self, timeframe) -> int:
         return TIMEFRAME_MAPPINGS.get(timeframe, 60 * 1000)  # Default to 1m if not found
 
     def _fetch_with_retry(self, method, *args, retries=3, delay=5, **kwargs):
@@ -125,11 +117,11 @@ class BacktestExchangeService(ExchangeInterface):
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
 
-    def get_current_price(self, pair):
-        pass
+    def get_current_price(self, pair: str) -> float:
+        raise NotImplementedError("get_current_price is not used in backtesting.")
 
-    def get_order_status(self, order_id):
-        pass
+    def get_order_status(self, order_id: str) -> Dict[str, Any]:
+        raise NotImplementedError("get_order_status is not used in backtesting.")
 
-    def cancel_order(self, order_id):
-        pass
+    def cancel_order(self, order_id: str) -> None:
+        raise NotImplementedError("cancel_order is not used in backtesting.")

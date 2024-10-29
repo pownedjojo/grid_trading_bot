@@ -13,3 +13,7 @@ class UnsupportedTimeframeError(Exception):
 class OrderCancellationError(Exception):
     """Raised when order cancellation fails."""
     pass
+
+class MissingEnvironmentVariableError(Exception):
+    """Raised when env variable are missing (EXCHANGE_API_KEY and/or EXCHANGE_SECRET_KEY)."""
+    pass

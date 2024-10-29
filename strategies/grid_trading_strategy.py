@@ -53,32 +53,32 @@ class GridTradingStrategy(TradingStrategy):
     def initialize_strategy(self):
         self.grid_manager.initialize_grid_levels()
 
-    def run(self):
+    async def run(self):
         if self.trading_mode == TradingMode.BACKTEST:
-            self._run_backtest()
+            await self._run_backtest()
         else:
-            self._run_live_or_paper_trading()
+            await self._run_live_or_paper_trading()
     
-    def _run_live_or_paper_trading(self):
+    async def _run_live_or_paper_trading(self):
         self.logger.info(f"Starting {'live' if self.trading_mode == TradingMode.LIVE else 'paper'} trading")
         pair = self.config_manager.get_pair()
         last_price: Optional[float] = None
 
-        def on_price_update(current_price, timestamp):
+        async def on_price_update(current_price, timestamp):
             nonlocal last_price
 
             if last_price is not None:
-                self._execute_orders(current_price, last_price, timestamp)
+                await self._execute_orders(current_price, last_price, timestamp)
 
-            if self._check_take_profit_stop_loss(current_price, timestamp):
+            if await self._check_take_profit_stop_loss(current_price, timestamp):
                 self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
-                self.exchange_service.close_connection()
+                await self.exchange_service.close_connection()
                 return
 
             last_price = current_price
-        self.exchange_service.listen_to_price_updates(pair, on_price_update)
+        await self.exchange_service.listen_to_price_updates(pair, on_price_update)
 
-    def _run_backtest(self) -> None:
+    async def _run_backtest(self) -> None:
         if self.data is None:
             self.logger.error("No data available for backtesting.")
             return
@@ -89,10 +89,10 @@ class GridTradingStrategy(TradingStrategy):
         timestamps = self.data.index
 
         for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), timestamps[1:]):
-            if self._check_take_profit_stop_loss(current_price, current_timestamp):
+            if await self._check_take_profit_stop_loss(current_price, current_timestamp):
                 break
-            self._execute_orders(current_price, previous_price, current_timestamp)
-            self.data.loc[current_timestamp, 'account_value'] = self.balance_tracker.get_total_balance_value(current_price)
+            await self._execute_orders(current_price, previous_price, current_timestamp)
+            self.data.loc[current_timestamp, 'account_value'] = await self.balance_tracker.get_total_balance_value(current_price)
     
     def generate_performance_report(self) -> Tuple[dict, list]:
         final_price = self.close_prices[-1]
@@ -110,20 +110,28 @@ class GridTradingStrategy(TradingStrategy):
         else:
             self.logger.info("Plotting is not available for live/paper trading mode.")
     
-    def _execute_orders(self, current_price: float, previous_price: float, current_timestamp: Union[int, str]) -> None:
-        self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)
-        self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, current_timestamp)
+    async def _execute_orders(self, current_price: float, previous_price: float, current_timestamp: Union[int, str]) -> None:
+        await self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)
+        await self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, current_timestamp)
 
-    def _check_take_profit_stop_loss(self, current_price: float, current_timestamp: Union[int, str]) -> bool:
+    async def _check_take_profit_stop_loss(self, current_price: float, current_timestamp: Union[int, str]) -> bool:
         if self.balance_tracker.crypto_balance == 0:
             return False
 
         if self.config_manager.is_take_profit_enabled() and current_price >= self.config_manager.get_take_profit_threshold():
-            self.order_manager.execute_take_profit_or_stop_loss_order(current_price=current_price, timestamp=current_timestamp, take_profit_order=True)
+            await self.order_manager.execute_take_profit_or_stop_loss_order(
+                current_price=current_price, 
+                timestamp=current_timestamp,
+                take_profit_order=True
+            )
             return True
 
         if self.config_manager.is_stop_loss_enabled() and current_price <= self.config_manager.get_stop_loss_threshold():
-            self.order_manager.execute_take_profit_or_stop_loss_order(current_price=current_price, timestamp=current_timestamp, stop_loss_order=True)
+            await self.order_manager.execute_take_profit_or_stop_loss_order(
+                current_price=current_price,
+                timestamp=current_timestamp, 
+                stop_loss_order=True
+            )
             return True
 
         return False

@@ -1,4 +1,4 @@
-import logging, traceback, cProfile
+import logging, traceback, cProfile, asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any
 from utils.arg_parser import parse_and_validate_console_args
@@ -23,50 +23,58 @@ from utils.logging_config import setup_logging
 
 class GridTradingBot:
     def __init__(self, config_path: str, save_performance_results_path: Optional[str] = None, no_plot: bool = False):
-        self.config_path = config_path
-        self.save_performance_results_path = save_performance_results_path
-        self.no_plot = no_plot
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.config_manager = self._initialize_config_manager()
-        setup_logging(
-            self.config_manager.get_logging_level(),
-            self.config_manager.should_log_to_file(),
-            self.config_manager.get_log_filename()
-        )
-        self.trading_mode = self.config_manager.get_trading_mode()
-        self.logger.info(f"Starting Grid Trading Bot in {self.trading_mode.value} mode")
+        try:
+            self.config_path = config_path
+            self.save_performance_results_path = save_performance_results_path
+            self.no_plot = no_plot
+            self.logger = logging.getLogger(self.__class__.__name__)
+            self.config_manager = self._initialize_config_manager()
+            setup_logging(
+                self.config_manager.get_logging_level(),
+                self.config_manager.should_log_to_file(),
+                self.config_manager.get_log_filename()
+            )
+            self.trading_mode = self.config_manager.get_trading_mode()
+            self.logger.info(f"Starting Grid Trading Bot in {self.trading_mode.value} mode")
 
-        self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, self.trading_mode)
-        self.order_execution_strategy = OrderExecutionStrategyFactory.create(self.config_manager, self.exchange_service)
-        self.grid_manager = GridManager(self.config_manager)
-        self.transaction_validator = TransactionValidator()
-        self.fee_calculator = FeeCalculator(self.config_manager)
-        self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
-        self.order_book = OrderBook()
-        self.order_manager = OrderManager(
-            self.config_manager,
-            self.grid_manager,
-            self.transaction_validator,
-            self.balance_tracker,
-            self.order_book,
-            self.order_execution_strategy
-        )
-        self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
-        self.plotter = Plotter(self.grid_manager, self.order_book) if self.trading_mode == TradingMode.BACKTEST else None
-        self.strategy = GridTradingStrategy(
-            self.config_manager,
-            self.exchange_service,
-            self.grid_manager,
-            self.order_manager,
-            self.balance_tracker,
-            self.trading_performance_analyzer,
-            self.plotter
-        )
+            self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, self.trading_mode)
+            self.order_execution_strategy = OrderExecutionStrategyFactory.create(self.config_manager, self.exchange_service)
+            self.grid_manager = GridManager(self.config_manager)
+            self.transaction_validator = TransactionValidator()
+            self.fee_calculator = FeeCalculator(self.config_manager)
+            self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
+            self.order_book = OrderBook()
+            self.order_manager = OrderManager(
+                self.config_manager,
+                self.grid_manager,
+                self.transaction_validator,
+                self.balance_tracker,
+                self.order_book,
+                self.order_execution_strategy
+            )
+            self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
+            self.plotter = Plotter(self.grid_manager, self.order_book) if self.trading_mode == TradingMode.BACKTEST else None
+            self.strategy = GridTradingStrategy(
+                self.config_manager,
+                self.exchange_service,
+                self.grid_manager,
+                self.order_manager,
+                self.balance_tracker,
+                self.trading_performance_analyzer,
+                self.plotter
+            )
 
-    def run(self) -> Optional[Dict[str, Any]]:
+        except (ConfigError, UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
+            self._log_and_exit(e)
+        except Exception as e:
+            self.logger.error("An unexpected error occurred.")
+            self.logger.error(traceback.format_exc())
+            exit(1)
+
+    async def run(self) -> Optional[Dict[str, Any]]:
         try:
             self.strategy.initialize_strategy()
-            self.strategy.run()
+            await self.strategy.run()
 
             if self.trading_mode == TradingMode.BACKTEST and not self.no_plot:
                 self.strategy.plot_results()
@@ -106,7 +114,7 @@ class GridTradingBot:
         self.logger.error(f"{type(exception).__name__}: {exception}")
         exit(1)
 
-def run_bot_with_config(
+async def run_bot_with_config(
     config_path: str,
     profile: bool = False, 
     save_performance_results_path: Optional[str] = None, 
@@ -115,20 +123,23 @@ def run_bot_with_config(
     bot = GridTradingBot(config_path, save_performance_results_path, no_plot)
 
     if profile:
-        cProfile.runctx("bot.run()", globals(), locals(), "profile_results.prof")
+        cProfile.runctx("asyncio.run(bot.run())", globals(), locals(), "profile_results.prof")
         return None
     else:
-        return bot.run()
+        return await bot.run()
 
 if __name__ == "__main__":
     args = parse_and_validate_console_args()
     
-    with ThreadPoolExecutor() as executor:
-        futures = []
-        for config_path in args.config:
-            futures.append(executor.submit(run_bot_with_config, config_path, args.profile, args.save_performance_results, args.no_plot))
+    async def main():
+        tasks = [
+            run_bot_with_config(config_path, args.profile, args.save_performance_results, args.no_plot)
+            for config_path in args.config
+        ]
         
-        for future in futures:
-            result = future.result()
-            if result and args.save_performance_results:
+        results = await asyncio.gather(*tasks)
+        if args.save_performance_results:
+            for result in results:
                 save_or_append_performance_results(result, args.save_performance_results)
+
+    asyncio.run(main())

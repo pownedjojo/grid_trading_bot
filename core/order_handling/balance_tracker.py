@@ -9,7 +9,7 @@ class BalanceTracker:
         self.crypto_balance: float = initial_crypto_balance
         self.total_fees: float = 0
 
-    def update_after_buy(self, quantity: float, price: float) -> None:
+    async def update_after_buy(self, quantity: float, price: float) -> None:
         fee = self.fee_calculator.calculate_fee(quantity * price)
         total_cost = quantity * price + fee
         if self.balance < total_cost:
@@ -19,7 +19,7 @@ class BalanceTracker:
         self.crypto_balance += quantity
         self.total_fees += fee
 
-    def update_after_sell(self, quantity: float, price: float) -> None:
+    async def update_after_sell(self, quantity: float, price: float) -> None:
         fee = self.fee_calculator.calculate_fee(quantity * price)
         if self.crypto_balance < quantity:
             raise InsufficientCryptoBalanceError("Insufficient crypto balance to complete the transaction")
@@ -28,9 +28,9 @@ class BalanceTracker:
         self.balance += quantity * price - fee
         self.total_fees += fee
     
-    def sell_all(self, price: float) -> None:
+    async def sell_all(self, price: float) -> None:
         if self.crypto_balance > 0:
-            self.update_after_sell(self.crypto_balance, price)
+            await self.update_after_sell(self.crypto_balance, price)
     
-    def get_total_balance_value(self, price: float) -> float:
+    async def get_total_balance_value(self, price: float) -> float:
         return self.balance + self.crypto_balance * price

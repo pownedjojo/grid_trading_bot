@@ -38,7 +38,7 @@ class GridManager:
         order_size = self.initial_balance / total_grids / current_price
         return order_size
     
-    def reset_grid_cycle(self, buy_grid_level: GridLevel) -> None:
+    async def reset_grid_cycle(self, buy_grid_level: GridLevel) -> None:
         buy_grid_level.reset_buy_level_cycle()
         self.logger.info(f"Buy Grid level at price {buy_grid_level.price} is reset and ready for the next buy/sell cycle.")
 

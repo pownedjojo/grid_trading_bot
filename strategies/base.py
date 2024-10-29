@@ -27,7 +27,7 @@ class TradingStrategy(ABC):
         pass
 
     @abstractmethod
-    def run(self):
+    async def run(self):
         """
         Run the strategy with historical or live data.
         Must be implemented by any subclass.

@@ -1,5 +1,5 @@
 import logging
-from .trading_modes import TradingMode
+from .trading_mode import TradingMode
 from .exceptions import ConfigValidationError
 
 class ConfigValidator:

@@ -1,8 +1,9 @@
 import json, os, logging
+from typing import Dict, List, Union, Any
 import pandas as pd
 from datetime import datetime, timedelta
 
-def save_or_append_performance_results(new_results, file_path):
+def save_or_append_performance_results(new_results: Dict[str, Any], file_path: str) -> None:
     try:
         if os.path.exists(file_path):
             with open(file_path, 'r') as json_file:

@@ -1,22 +1,18 @@
 import ccxt, logging, time, os
 from typing import Optional, Dict, Any
 import pandas as pd
+from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
 from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 
 class BacktestExchangeService(ExchangeInterface):
-    def __init__(self, config_manager):
+    def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
         self.logger = logging.getLogger(__name__)
         self.historical_data_file = self.config_manager.get_historical_data_file()
         self.exchange_name = self.config_manager.get_exchange_name()
         self.exchange = self._initialize_exchange()
-
-        ## ADDED: TO CHECK
-        self.initial_balance = self.config_manager.get_initial_balance()
-        self.fiat_balance = self.initial_balance
-        self.crypto_balance = 0
     
     def _initialize_exchange(self) -> Optional[ccxt.Exchange]:
         try:
@@ -29,14 +25,6 @@ class BacktestExchangeService(ExchangeInterface):
             self.logger.warning(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
             return False
         return True
-    
-    def get_balance(self):
-        ## TODO: SHOULD NOT BE CALLED ?
-        return {"fiat_balance": self.fiat_balance, "crypto_balance": self.crypto_balance}
-
-    def place_order(self, pair, order_type, amount, price=None):
-        self.logger.info(f"Simulating {order_type} order: {amount} {pair} at price {price}")
-        return {'id': f"backtest-{int(time.time())}", 'pair': pair, 'type': order_type, 'amount': amount, 'price': price, 'status': 'filled'}
 
     def fetch_ohlcv(self, pair, timeframe, start_date, end_date) -> pd.DataFrame:
         if self.historical_data_file and os.path.exists(self.historical_data_file):
@@ -116,6 +104,12 @@ class BacktestExchangeService(ExchangeInterface):
                 else:
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
+
+    def place_order(self, pair, order_type, amount, price=None):
+        raise NotImplementedError("place_order is not used in backtesting.")
+
+    def get_balance(self):
+        raise NotImplementedError("get_balance is not used in backtesting.")
 
     def get_current_price(self, pair: str) -> float:
         raise NotImplementedError("get_current_price is not used in backtesting.")

@@ -1,6 +1,6 @@
 import json, os, logging
 from typing import Optional
-from .trading_modes import TradingMode
+from .trading_mode import TradingMode
 from .exceptions import ConfigFileNotFoundError, ConfigParseError
 
 class ConfigManager:

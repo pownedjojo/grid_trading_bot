@@ -6,7 +6,7 @@ class TradingMode(Enum):
     LIVE = "live"
 
     @staticmethod
-    def from_string(mode_str):
+    def from_string(mode_str: str):
         try:
             return TradingMode(mode_str)
         except ValueError:

@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Union
 from ..validation.exceptions import InvalidOrderTypeError
 
 class OrderType(Enum):
@@ -11,7 +12,7 @@ class OrderState(Enum):
     CANCELLED = 'cancelled'
 
 class Order:
-    def __init__(self, price, quantity, order_type, timestamp):
+    def __init__(self, price: float, quantity: float, order_type: OrderType, timestamp: Union[int, str]):
         if not isinstance(order_type, OrderType):
             raise InvalidOrderTypeError("Invalid order type")
 
@@ -21,20 +22,20 @@ class Order:
         self.timestamp = timestamp
         self.state = OrderState.PENDING
     
-    def complete(self):
+    def complete(self) -> None:
         self.state = OrderState.COMPLETED
 
-    def cancel(self):
+    def cancel(self) -> None:
         self.state = OrderState.COMPLETED
 
-    def is_pending(self):
+    def is_pending(self) -> bool:
         return self.state == OrderState.PENDING
 
-    def is_completed(self):
+    def is_completed(self) -> bool:
         return self.state == OrderState.COMPLETED
     
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Order({self.order_type}, price={self.price}, quantity={self.quantity}, timestamp={self.timestamp}, state={self.state})"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__str__()

@@ -1,11 +1,29 @@
 import logging, itertools
+from typing import Optional, Tuple, Union
+import pandas as pd
 import numpy as np
 from .base import TradingStrategy
-from config.trading_modes import TradingMode
+from config.trading_mode import TradingMode
 from core.order_handling.order import OrderType
+from config.config_manager import ConfigManager
+from core.services.exchange_interface import ExchangeInterface
+from core.grid_management.grid_manager import GridManager
+from core.order_handling.order_manager import OrderManager
+from core.order_handling.balance_tracker import BalanceTracker
+from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
+from strategies.plotter import Plotter
 
 class GridTradingStrategy(TradingStrategy):
-    def __init__(self, config_manager, exchange_service, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter):
+    def __init__(
+        self,
+        config_manager: ConfigManager,
+        exchange_service: ExchangeInterface,
+        grid_manager: GridManager,
+        order_manager: OrderManager,
+        balance_tracker: BalanceTracker,
+        trading_performance_analyzer: TradingPerformanceAnalyzer,
+        plotter: Optional[Plotter] = None
+    ):
         super().__init__(config_manager, balance_tracker)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.exchange_service = exchange_service
@@ -14,12 +32,18 @@ class GridTradingStrategy(TradingStrategy):
         self.trading_performance_analyzer = trading_performance_analyzer
         self.plotter = plotter
         self.trading_mode = self.config_manager.get_trading_mode()
-        
-        if self.trading_mode == TradingMode.BACKTEST:
-            pair, timeframe, start_date, end_date = self._extract_config()
-            self.data = self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
+        self.data = self._initialize_data() if self.trading_mode == TradingMode.BACKTEST else None
     
-    def _extract_config(self):
+    def _initialize_data(self) -> Optional[pd.DataFrame]:
+        try:
+            pair, timeframe, start_date, end_date = self._extract_config()
+            self.logger.info(f"Fetching OHLCV data for backtest: {pair}, {timeframe} from {start_date} to {end_date}")
+            return self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
+        except Exception as e:
+            self.logger.error(f"Failed to initialize data for backtest: {e}")
+            return None
+    
+    def _extract_config(self) -> Tuple[str, str, str, str]:
         pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
         timeframe = self.config_manager.get_timeframe()
         start_date = self.config_manager.get_start_date()
@@ -31,26 +55,46 @@ class GridTradingStrategy(TradingStrategy):
 
     def run(self):
         if self.trading_mode == TradingMode.BACKTEST:
-            self._simulate_backtest()
+            self._run_backtest()
         else:
             self._run_live_or_paper_trading()
     
     def _run_live_or_paper_trading(self):
         self.logger.info(f"Starting {'live' if self.trading_mode == TradingMode.LIVE else 'paper'} trading")
-        ## TODO
+        pair = self.config_manager.get_pair()
+        last_price: Optional[float] = None
 
-    def _simulate_backtest(self):
+        def on_price_update(current_price, timestamp):
+            nonlocal last_price
+
+            if last_price is not None:
+                self._execute_orders(current_price, last_price, timestamp)
+
+            if self._check_take_profit_stop_loss(current_price, timestamp):
+                self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
+                self.exchange_service.close_connection()
+                return
+
+            last_price = current_price
+        self.exchange_service.listen_to_price_updates(pair, on_price_update)
+
+    def _run_backtest(self) -> None:
+        if self.data is None:
+            self.logger.error("No data available for backtesting.")
+            return
+
         self.logger.info("Starting backtest simulation")
         self.data['account_value'] = np.nan
         self.close_prices = self.data['close'].values
         timestamps = self.data.index
+
         for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), timestamps[1:]):
             if self._check_take_profit_stop_loss(current_price, current_timestamp):
                 break
             self._execute_orders(current_price, previous_price, current_timestamp)
             self.data.loc[current_timestamp, 'account_value'] = self.balance_tracker.get_total_balance_value(current_price)
     
-    def generate_performance_report(self):
+    def generate_performance_report(self) -> Tuple[dict, list]:
         final_price = self.close_prices[-1]
         return self.trading_performance_analyzer.generate_performance_summary(
             self.data, 
@@ -60,17 +104,17 @@ class GridTradingStrategy(TradingStrategy):
             self.balance_tracker.total_fees
         )
 
-    def plot_results(self):
+    def plot_results(self) -> None:
         if self.trading_mode == TradingMode.BACKTEST:
             self.plotter.plot_results(self.data)
         else:
             self.logger.info("Plotting is not available for live/paper trading mode.")
     
-    def _execute_orders(self, current_price, previous_price, current_timestamp):
+    def _execute_orders(self, current_price: float, previous_price: float, current_timestamp: Union[int, str]) -> None:
         self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)
         self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, current_timestamp)
 
-    def _check_take_profit_stop_loss(self, current_price, current_timestamp):
+    def _check_take_profit_stop_loss(self, current_price: float, current_timestamp: Union[int, str]) -> bool:
         if self.balance_tracker.crypto_balance == 0:
             return False
 

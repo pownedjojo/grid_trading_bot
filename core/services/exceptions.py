@@ -9,3 +9,7 @@ class DataFetchError(Exception):
 class UnsupportedTimeframeError(Exception):
     """Raised when a timeframe is not supported by a given exchange."""
     pass
+
+class OrderCancellationError(Exception):
+    """Raised when order cancellation fails."""
+    pass

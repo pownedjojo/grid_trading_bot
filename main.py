@@ -1,8 +1,8 @@
 import logging, traceback, cProfile
-import pandas as pd
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Dict, Any
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
-from concurrent.futures import ThreadPoolExecutor
 from core.services.exchange_service_factory import ExchangeServiceFactory
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
@@ -13,89 +13,105 @@ from core.order_handling.fee_calculator import FeeCalculator
 from core.order_handling.balance_tracker import BalanceTracker
 from core.order_handling.order_book import OrderBook
 from core.grid_management.grid_manager import GridManager
+from core.order_handling.order_execution_strategy_factory import OrderExecutionStrategyFactory
 from core.services.exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
-from config.trading_modes import TradingMode
+from config.trading_mode import TradingMode
 from utils.logging_config import setup_logging
 
 class GridTradingBot:
-    def __init__(self, config_path, save_performance_results_path=None, no_plot=False):
+    def __init__(self, config_path: str, save_performance_results_path: Optional[str] = None, no_plot: bool = False):
         self.config_path = config_path
         self.save_performance_results_path = save_performance_results_path
         self.no_plot = no_plot
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.config_manager = self._initialize_config_manager()
+        setup_logging(
+            self.config_manager.get_logging_level(),
+            self.config_manager.should_log_to_file(),
+            self.config_manager.get_log_filename()
+        )
+        self.trading_mode = self.config_manager.get_trading_mode()
+        self.logger.info(f"Starting Grid Trading Bot in {self.trading_mode.value} mode")
 
-    def run(self):
+        self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, self.trading_mode)
+        self.order_execution_strategy = OrderExecutionStrategyFactory.create(self.config_manager, self.exchange_service)
+        self.grid_manager = GridManager(self.config_manager)
+        self.transaction_validator = TransactionValidator()
+        self.fee_calculator = FeeCalculator(self.config_manager)
+        self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
+        self.order_book = OrderBook()
+        self.order_manager = OrderManager(
+            self.config_manager,
+            self.grid_manager,
+            self.transaction_validator,
+            self.balance_tracker,
+            self.order_book,
+            self.order_execution_strategy
+        )
+        self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
+        self.plotter = Plotter(self.grid_manager, self.order_book) if self.trading_mode == TradingMode.BACKTEST else None
+        self.strategy = GridTradingStrategy(
+            self.config_manager,
+            self.exchange_service,
+            self.grid_manager,
+            self.order_manager,
+            self.balance_tracker,
+            self.trading_performance_analyzer,
+            self.plotter
+        )
+
+    def run(self) -> Optional[Dict[str, Any]]:
         try:
-            self.config_manager = self._initialize_config_manager()
-            setup_logging(self.config_manager.get_logging_level(), self.config_manager.should_log_to_file(), self.config_manager.get_log_filename())
-            trading_mode = self.config_manager.get_trading_mode()
-            self.logger.info(f"Starting Grid Trading Bot in {trading_mode.value} mode")
-            self.order_book = OrderBook()
-            self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, trading_mode)
-            self.grid_manager = GridManager(self.config_manager)
-            self.transaction_validator = TransactionValidator()
-            self.fee_calculator = FeeCalculator(self.config_manager)
-            self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
-            self.order_manager = OrderManager(self.config_manager, self.grid_manager, self.transaction_validator, self.balance_tracker, self.order_book)
-            self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
-            self.plotter = None
+            self.strategy.initialize_strategy()
+            self.strategy.run()
 
-            if trading_mode == TradingMode.BACKTEST:
-                self.plotter = Plotter(self.grid_manager, self.order_book)
+            if self.trading_mode == TradingMode.BACKTEST and not self.no_plot:
+                self.strategy.plot_results()
 
-            strategy = GridTradingStrategy(
-                self.config_manager, 
-                self.exchange_service, 
-                self.grid_manager, 
-                self.order_manager, 
-                self.balance_tracker, 
-                self.trading_performance_analyzer, 
-                self.plotter
-            )
-            strategy.initialize_strategy()
-            strategy.run()
-            
-            if trading_mode == TradingMode.BACKTEST and not self.no_plot:
-                strategy.plot_results()
-            
-            performance_summary, formatted_orders = strategy.generate_performance_report()
-            if trading_mode == TradingMode.LIVE:
-                self.logger.info("Live trading session completed. Performance data available.")
-            elif trading_mode == TradingMode.PAPER_TRADING:
-                self.logger.info("Paper trading session completed. Review the performance summary.")
-            else:
-                return {"config": self.config_path, "performance_summary": performance_summary, "orders": formatted_orders}
+            return self._generate_and_log_performance()
 
-        except ConfigError as e:
-            self._handle_config_error(e)
-        except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
-            self._handle_exchange_service_error(e)
+        except (ConfigError, UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
+            self._log_and_exit(e)
+
         except Exception as e:
-            self._handle_general_error(e)
+            self.logger.error("An unexpected error occurred.")
+            self.logger.error(traceback.format_exc())
+            exit(1)
 
-    def _initialize_config_manager(self):
+    def _initialize_config_manager(self) -> ConfigManager:
         try:
             return ConfigManager(self.config_path, ConfigValidator())
         except ConfigError as e:
             raise e
 
-    def _handle_config_error(self, exception):
-        self.logger.error(f"Configuration error: {exception}")
-        exit(1)
-    
-    def _handle_exchange_service_error(self, exception):
-        self.logger.error(f"Exchange Service error: {exception}")
+    def _generate_and_log_performance(self) -> Optional[Dict[str, Any]]:
+        performance_summary, formatted_orders = self.strategy.generate_performance_report()
+        
+        if self.trading_mode == TradingMode.LIVE:
+            self.logger.info("Live trading session completed. Performance data available.")
+        elif self.trading_mode == TradingMode.PAPER_TRADING:
+            self.logger.info("Paper trading session completed. Review the performance summary.")
+        elif self.trading_mode == TradingMode.BACKTEST:
+            return {
+                "config": self.config_path,
+                "performance_summary": performance_summary,
+                "orders": formatted_orders
+            }
+        return None
+
+    def _log_and_exit(self, exception: Exception) -> None:
+        self.logger.error(f"{type(exception).__name__}: {exception}")
         exit(1)
 
-    def _handle_general_error(self, exception):
-        self.logger.error(f"An unexpected error occurred: {exception}")
-        self.logger.error(traceback.format_exc())
-        exit(1)
-
-def run_bot_with_config(config_path, profile=False, save_performance_results_path=None, no_plot=False):
+def run_bot_with_config(
+    config_path: str,
+    profile: bool = False, 
+    save_performance_results_path: Optional[str] = None, 
+    no_plot: bool = False
+) -> Optional[Dict[str, Any]]:
     bot = GridTradingBot(config_path, save_performance_results_path, no_plot)
 
     if profile:

@@ -9,8 +9,8 @@ class ExchangeServiceFactory:
         if trading_mode == TradingMode.BACKTEST:
             return BacktestExchangeService(config_manager)
         elif trading_mode == TradingMode.PAPER_TRADING:
-            return LiveExchangeService(config_manager, paper=True)
+            return LiveExchangeService(config_manager, is_paper_trading_activated=True)
         elif trading_mode == TradingMode.LIVE:
-            return LiveExchangeService(config_manager, paper=False)
+            return LiveExchangeService(config_manager, is_paper_trading_activated=False)
         else:
             raise ValueError(f"Unsupported trading mode: {trading_mode}")

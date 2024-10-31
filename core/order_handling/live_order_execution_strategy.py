@@ -3,6 +3,7 @@ from typing import Optional
 from .order import OrderType
 from ..services.exchange_interface import ExchangeInterface
 from ..order_handling.order_execution_strategy import OrderExecutionStrategy
+from .exceptions import OrderExecutionFailedError
 
 class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     def __init__(self, exchange_service: ExchangeInterface, max_retries: int = 3, retry_delay: int = 1, max_slippage: float = 0.01) -> None:
@@ -22,7 +23,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
                     return order_result  # Order fully filled
 
                 elif order_result['status'] == 'partially_filled':
-                    order_result = await self._handle_partial_fill(order_result, pair, order_type, initial_quantity, price)
+                    order_result = await self._handle_partial_fill(order_result, pair, order_type)
                     if order_result:
                         return order_result
 
@@ -34,8 +35,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
                 self.logger.error(f"Attempt {attempt + 1} failed with error: {str(e)}")
                 await asyncio.sleep(self.retry_delay)
 
-        self.logger.warning(f"Limit order for {order_type} at {price} could not be filled. Placing a market order.")
-        return await self._normalize_order_result(self.exchange_service.place_order(pair, order_type.name.lower(), quantity))
+        raise OrderExecutionFailedError("Failed to execute limit order after maximum retries.",order_type, pair, quantity, price)
 
     async def _normalize_order_result(self, raw_order_result: dict) -> dict:
         return {
@@ -56,7 +56,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
         adjustment = self.max_slippage / self.max_retries * attempt
         return price * (1 + adjustment) if order_type == OrderType.BUY else price * (1 - adjustment)
     
-    async def _handle_partial_fill(self, order_result: dict, pair: str, order_type: OrderType, initial_quantity: float, price: float) -> Optional[dict]:
+    async def _handle_partial_fill(self, order_result: dict, pair: str, order_type: OrderType) -> Optional[dict]:
         filled_qty = order_result.get('filled_qty', 0)
         self.logger.info(f"Order partially filled with {filled_qty}. Attempting to cancel and retry full quantity.")
 

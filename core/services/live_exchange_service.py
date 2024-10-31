@@ -3,17 +3,17 @@ from typing import Dict, Union, Callable
 from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
-from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError, MissingEnvironmentVariableError
+from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError, MissingEnvironmentVariableError, InvalidOrderTypeError
 
 class LiveExchangeService(ExchangeInterface):
-    def __init__(self, config_manager: ConfigManager):
+    def __init__(self, config_manager: ConfigManager, is_paper_trading_activated: bool):
         self.config_manager = config_manager
+        self.is_paper_trading_activated = is_paper_trading_activated
         self.logger = logging.getLogger(__name__)
         self.exchange_name = self.config_manager.get_exchange_name()
-        self.trading_mode = self.config_manager.get_trading_mode()
-        self.exchange = self._initialize_exchange()
         self.api_key = self._get_env_variable("EXCHANGE_API_KEY")
         self.secret_key = self._get_env_variable("EXCHANGE_SECRET_KEY")
+        self.exchange = self._initialize_exchange()
         self.connection_active = False
     
     def _get_env_variable(self, key: str) -> str:
@@ -30,7 +30,7 @@ class LiveExchangeService(ExchangeInterface):
                 'enableRateLimit': True
             })
 
-            if self.trading_mode == TradingMode.PAPER_TRADING:
+            if self.is_paper_trading_activated:
                 self._enable_sandbox_mode(exchange)
             return exchange
         except AttributeError:
@@ -90,6 +90,9 @@ class LiveExchangeService(ExchangeInterface):
             self.logger.info(f"Placed {order_type} order: {order}")
             return order
 
+        except ValueError as e:
+            self.logger.error(f"Error placing order - invalid order type specified {str(e)}")
+            raise InvalidOrderTypeError(f"Error placing order: {str(e)}")
         except ccxt.NetworkError as e:
             self.logger.warning(f"Network error placing {order_type} order for {pair}: {str(e)}.")
             raise DataFetchError(f"Network issue occurred while placing order: {str(e)}")

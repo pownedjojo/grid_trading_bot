@@ -1,0 +1,42 @@
+import pytest
+from unittest.mock import Mock
+from config.trading_mode import TradingMode
+from config.config_manager import ConfigManager
+from core.order_handling.order_execution_strategy_factory import OrderExecutionStrategyFactory
+from core.order_handling.live_order_execution_strategy import LiveOrderExecutionStrategy
+from core.order_handling.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
+from core.services.exchange_interface import ExchangeInterface
+
+class TestOrderExecutionStrategyFactory:
+    @pytest.fixture
+    def config_manager(self):
+        return Mock(spec=ConfigManager)
+
+    @pytest.fixture
+    def exchange_service(self):
+        return Mock(spec=ExchangeInterface)
+
+    def test_create_live_strategy(self, config_manager, exchange_service):
+        config_manager.get_trading_mode.return_value = TradingMode.LIVE
+        strategy = OrderExecutionStrategyFactory.create(config_manager, exchange_service)
+        
+        assert isinstance(strategy, LiveOrderExecutionStrategy), "Expected LiveOrderExecutionStrategy instance for live trading mode"
+        assert strategy.exchange_service == exchange_service, "Expected exchange_service to be set correctly in LiveOrderExecutionStrategy"
+
+    def test_create_paper_trading_strategy(self, config_manager, exchange_service):
+        config_manager.get_trading_mode.return_value = TradingMode.PAPER_TRADING
+        strategy = OrderExecutionStrategyFactory.create(config_manager, exchange_service)
+        
+        assert isinstance(strategy, LiveOrderExecutionStrategy), "Expected LiveOrderExecutionStrategy instance for paper trading mode"
+        assert strategy.exchange_service == exchange_service, "Expected exchange_service to be set correctly in LiveOrderExecutionStrategy"
+
+    def test_create_backtest_strategy(self, config_manager, exchange_service):
+        config_manager.get_trading_mode.return_value = TradingMode.BACKTEST
+        strategy = OrderExecutionStrategyFactory.create(config_manager, exchange_service)
+        
+        assert isinstance(strategy, BacktestOrderExecutionStrategy), "Expected BacktestOrderExecutionStrategy instance for backtesting mode"
+
+    def test_invalid_trading_mode_raises_error(self, config_manager, exchange_service):
+        config_manager.get_trading_mode.return_value = "UNKNOWN_MODE"  # Simulate an invalid mode
+        with pytest.raises(ValueError, match="Unknown trading mode: UNKNOWN_MODE"):
+            OrderExecutionStrategyFactory.create(config_manager, exchange_service)

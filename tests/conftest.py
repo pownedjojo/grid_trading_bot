@@ -6,7 +6,8 @@ def valid_config():
     return {
         "exchange": {
             "name": "binance",
-            "trading_fee": 0.001
+            "trading_fee": 0.001,
+            'trading_mode': 'backtest'
         },
         "pair": {
             "base_currency": "ETH",

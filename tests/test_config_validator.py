@@ -49,6 +49,19 @@ class TestConfigValidator:
             config_validator.validate(valid_config)
         assert 'exchange.name' in excinfo.value.invalid_fields
         assert 'exchange.trading_fee' in excinfo.value.invalid_fields
+    
+    def test_validate_valid_trading_modes(self, config_validator, valid_config):
+        for mode in ['live', 'paper_trading', 'backtest']:
+            valid_config['exchange']['trading_mode'] = mode
+            try:
+                config_validator.validate(valid_config)
+            except ConfigValidationError:
+                pytest.fail(f"Valid trading_mode '{mode}' raised ConfigValidationError")
+
+    def test_validate_invalid_trading_mode(self, config_validator, valid_config):
+        valid_config['exchange']['trading_mode'] = 'invalid_mode'
+        with pytest.raises(ConfigValidationError, match="exchange.trading_mode"):
+            config_validator.validate(valid_config)
 
     def test_validate_invalid_timeframe(self, config_validator, valid_config):
         valid_config['trading_settings']['timeframe'] = '3h'  # Invalid timeframe

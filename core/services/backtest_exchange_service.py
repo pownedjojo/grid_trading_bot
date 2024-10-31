@@ -4,7 +4,7 @@ import pandas as pd
 from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
-from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
+from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError, HistoricalMarketDataFileNotFoundError
 
 class BacktestExchangeService(ExchangeInterface):
     def __init__(self, config_manager: ConfigManager):
@@ -27,7 +27,10 @@ class BacktestExchangeService(ExchangeInterface):
         return True
 
     def fetch_ohlcv(self, pair, timeframe, start_date, end_date) -> pd.DataFrame:
-        if self.historical_data_file and os.path.exists(self.historical_data_file):
+        if self.historical_data_file:
+            if not os.path.exists(self.historical_data_file):
+                raise HistoricalMarketDataFileNotFoundError(f"Failed to load OHLCV data from file: {self.historical_data_file}")
+    
             self.logger.info(f"Loading OHLCV data from file: {self.historical_data_file}")
             return self._load_ohlcv_from_file(self.historical_data_file, start_date, end_date)
 

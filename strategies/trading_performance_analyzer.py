@@ -77,7 +77,7 @@ class TradingPerformanceAnalyzer:
         sortino_ratio = excess_returns.mean() / downside_returns.std() * np.sqrt(252)
         return round(sortino_ratio, 2)
 
-    def _get_formatted_orders(self) -> List[List[Union[str, float]]]:
+    def get_formatted_orders(self) -> List[List[Union[str, float]]]:
         orders = []
         buy_orders_with_grid = self.order_book.get_buy_orders_with_grid()
         sell_orders_with_grid = self.order_book.get_sell_orders_with_grid()
@@ -161,7 +161,7 @@ class TradingPerformanceAnalyzer:
             "Sortino Ratio": f"{sortino_ratio:.2f}"
         }
 
-        formatted_orders = self._get_formatted_orders()
+        formatted_orders = self.get_formatted_orders()
 
         orders_table = tabulate(formatted_orders, headers=["Order Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
         self.logger.info("\nFormatted Orders:\n" + orders_table)

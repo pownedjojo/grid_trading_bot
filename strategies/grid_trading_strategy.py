@@ -33,6 +33,7 @@ class GridTradingStrategy(TradingStrategy):
         self.plotter = plotter
         self.trading_mode = self.config_manager.get_trading_mode()
         self.data = self._initialize_data() if self.trading_mode == TradingMode.BACKTEST else None
+        self._running = True
     
     def _initialize_data(self) -> Optional[pd.DataFrame]:
         try:
@@ -52,6 +53,17 @@ class GridTradingStrategy(TradingStrategy):
 
     def initialize_strategy(self):
         self.grid_manager.initialize_grid_levels()
+    
+    async def stop(self):
+        self._running = False
+        await self.exchange_service.close_connection()
+        self.logger.info("Trading execution stopped.")
+
+    async def restart(self):
+        if not self._running:
+            self._running = True
+            self.logger.info("Restarting trading session.")
+            await self.run()
 
     async def run(self):
         if self.trading_mode == TradingMode.BACKTEST:
@@ -66,13 +78,17 @@ class GridTradingStrategy(TradingStrategy):
 
         async def on_price_update(current_price, timestamp):
             nonlocal last_price
+            
+            if not self._running:
+                self.logger.info("Trading stopped; halting price updates.")
+                return
 
             if last_price is not None:
                 await self._execute_orders(current_price, last_price, timestamp)
 
             if await self._check_take_profit_stop_loss(current_price, timestamp):
                 self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
-                await self.exchange_service.close_connection()
+                await self.stop()
                 return
 
             last_price = current_price

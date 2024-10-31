@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
+from bot_controller import BotController
 from core.services.exchange_service_factory import ExchangeServiceFactory
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
@@ -121,12 +122,17 @@ async def run_bot_with_config(
     no_plot: bool = False
 ) -> Optional[Dict[str, Any]]:
     bot = GridTradingBot(config_path, save_performance_results_path, no_plot)
+    bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.trading_performance_analyzer)
 
     if profile:
         cProfile.runctx("asyncio.run(bot.run())", globals(), locals(), "profile_results.prof")
         return None
     else:
-        return await bot.run()
+        if bot.trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}:
+            bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.order_book)
+            await asyncio.gather(bot.run(), bot_controller.command_listener())
+        else:
+            await bot.run()
 
 if __name__ == "__main__":
     args = parse_and_validate_console_args()

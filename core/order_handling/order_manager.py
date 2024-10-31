@@ -3,13 +3,12 @@ from typing import Union
 from .order import Order, OrderType
 from ..order_handling.balance_tracker import BalanceTracker
 from config.config_manager import ConfigManager
-from ..order_handling.order_execution_strategy import OrderExecutionStrategy
 from ..order_handling.order_book import OrderBook
 from ..grid_management.grid_manager import GridManager
 from ..grid_management.grid_level import GridLevel
 from ..validation.transaction_validator import TransactionValidator
 from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
-from .order_execution_strategy import OrderExecutionStrategy
+from .execution_strategy.order_execution_strategy import OrderExecutionStrategy
 
 class OrderManager:
     def __init__(

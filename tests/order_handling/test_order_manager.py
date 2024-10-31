@@ -5,8 +5,8 @@ from core.order_handling.order import OrderType
 from core.grid_management.grid_level import GridLevel
 from core.services.exchange_interface import ExchangeInterface
 from config.trading_mode import TradingMode
-from core.order_handling.live_order_execution_strategy import LiveOrderExecutionStrategy
-from core.order_handling.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
+from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
+from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
 from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 
 class TestOrderManager:

@@ -1,9 +1,9 @@
 from config.trading_mode import TradingMode
 from config.config_manager import ConfigManager
-from ..order_handling.live_order_execution_strategy import LiveOrderExecutionStrategy
-from ..order_handling.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
-from ..order_handling.order_execution_strategy import OrderExecutionStrategy
-from ..services.exchange_interface import ExchangeInterface
+from .live_order_execution_strategy import LiveOrderExecutionStrategy
+from .backtest_order_execution_strategy import BacktestOrderExecutionStrategy
+from .order_execution_strategy import OrderExecutionStrategy
+from core.services.exchange_interface import ExchangeInterface
 
 class OrderExecutionStrategyFactory:
     @staticmethod

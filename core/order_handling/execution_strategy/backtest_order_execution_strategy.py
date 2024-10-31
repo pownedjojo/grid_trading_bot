@@ -1,6 +1,6 @@
 import time
-from .order import OrderType
-from ..order_handling.order_execution_strategy import OrderExecutionStrategy
+from ..order import OrderType
+from .order_execution_strategy import OrderExecutionStrategy
 
 class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
     async def execute_order(self, order_type: OrderType, pair: str, quantity: float, price: float) -> dict:

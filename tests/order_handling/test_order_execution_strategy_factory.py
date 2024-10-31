@@ -2,9 +2,9 @@ import pytest
 from unittest.mock import Mock
 from config.trading_mode import TradingMode
 from config.config_manager import ConfigManager
-from core.order_handling.order_execution_strategy_factory import OrderExecutionStrategyFactory
-from core.order_handling.live_order_execution_strategy import LiveOrderExecutionStrategy
-from core.order_handling.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
+from core.order_handling.execution_strategy.order_execution_strategy_factory import OrderExecutionStrategyFactory
+from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
+from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
 from core.services.exchange_interface import ExchangeInterface
 
 class TestOrderExecutionStrategyFactory:

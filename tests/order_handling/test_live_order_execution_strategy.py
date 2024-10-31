@@ -1,6 +1,6 @@
 import pytest, asyncio
 from unittest.mock import AsyncMock, patch
-from core.order_handling.live_order_execution_strategy import LiveOrderExecutionStrategy
+from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
 from core.order_handling.order import OrderType
 from core.services.exceptions import DataFetchError
 from core.services.exchange_interface import ExchangeInterface

@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
-from bot_controller import BotController
+from core.bot_controller.bot_controller import BotController
 from core.services.exchange_service_factory import ExchangeServiceFactory
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
@@ -14,7 +14,7 @@ from core.order_handling.fee_calculator import FeeCalculator
 from core.order_handling.balance_tracker import BalanceTracker
 from core.order_handling.order_book import OrderBook
 from core.grid_management.grid_manager import GridManager
-from core.order_handling.order_execution_strategy_factory import OrderExecutionStrategyFactory
+from core.order_handling.execution_strategy.order_execution_strategy_factory import OrderExecutionStrategyFactory
 from core.services.exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator

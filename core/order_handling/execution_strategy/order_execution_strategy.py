@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from .order import OrderType
+from ..order import OrderType
 
 class OrderExecutionStrategy(ABC):
     @abstractmethod

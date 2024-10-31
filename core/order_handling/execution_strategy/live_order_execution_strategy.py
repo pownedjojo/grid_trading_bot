@@ -1,9 +1,9 @@
 import time, logging, asyncio
 from typing import Optional
-from .order import OrderType
-from ..services.exchange_interface import ExchangeInterface
-from ..order_handling.order_execution_strategy import OrderExecutionStrategy
-from .exceptions import OrderExecutionFailedError
+from ..order import OrderType
+from core.services.exchange_interface import ExchangeInterface
+from .order_execution_strategy import OrderExecutionStrategy
+from ..exceptions import OrderExecutionFailedError
 
 class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     def __init__(self, exchange_service: ExchangeInterface, max_retries: int = 3, retry_delay: int = 1, max_slippage: float = 0.01) -> None:

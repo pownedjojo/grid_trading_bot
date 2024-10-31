@@ -21,7 +21,7 @@ class TestBacktestOrderExecutionStrategy:
         assert result["id"] == "backtest-1622505600", "Order ID should reflect mocked timestamp"
         assert result["pair"] == pair, "Pair should match input pair"
         assert result["type"] == order_type.name, "Order type should match 'BUY'"
-        assert result["quantity"] == quantity, "Quantity should match input quantity"
+        assert result["filled_qty"] == quantity, "Quantity should match input quantity"
         assert result["price"] == price, "Price should match input price"
         assert result["status"] == "filled", "Order should be immediately filled in backtest mode"
 
@@ -38,6 +38,6 @@ class TestBacktestOrderExecutionStrategy:
         assert result["id"] == "backtest-1622505600", "Order ID should reflect mocked timestamp"
         assert result["pair"] == pair, "Pair should match input pair"
         assert result["type"] == order_type.name, "Order type should match 'SELL'"
-        assert result["quantity"] == quantity, "Quantity should match input quantity"
+        assert result["filled_qty"] == quantity, "Quantity should match input quantity"
         assert result["price"] == price, "Price should match input price"
         assert result["status"] == "filled", "Order should be immediately filled in backtest mode"

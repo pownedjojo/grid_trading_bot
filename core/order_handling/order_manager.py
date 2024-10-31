@@ -45,6 +45,7 @@ class OrderManager:
     async def execute_take_profit_or_stop_loss_order(self, current_price: float, timestamp: Union[int, str], take_profit_order: bool = False, stop_loss_order: bool = False) -> None:
         if take_profit_order or stop_loss_order:
             try:
+                event = "Take profit" if take_profit_order else "Stop loss"
                 order_result = await self.order_execution_strategy.execute_order(
                     OrderType.SELL, 
                     self.config_manager.get_pair(), 
@@ -61,7 +62,6 @@ class OrderManager:
 
                 self.order_book.add_order(order)
                 await self.balance_tracker.update_after_sell(order.quantity, order.price)
-                event = "Take profit" if take_profit_order else "Stop loss"
                 self.logger.info(f"{event} triggered at {current_price} and sell order executed.")
             
             except Exception as e:

@@ -103,6 +103,8 @@ class GridTradingStrategy(TradingStrategy):
         self.data['account_value'] = np.nan
         self.close_prices = self.data['close'].values
         timestamps = self.data.index
+        initial_price = self.close_prices[0]
+        self.data.loc[timestamps[0], 'account_value'] = await self.balance_tracker.get_total_balance_value(initial_price)
 
         for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), timestamps[1:]):
             if await self._check_take_profit_stop_loss(current_price, current_timestamp):

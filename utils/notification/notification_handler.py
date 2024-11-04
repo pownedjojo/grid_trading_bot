@@ -2,13 +2,14 @@ from typing import List, Optional, Union
 import apprise, logging, asyncio
 from concurrent.futures import ThreadPoolExecutor
 from .notification_content import NotificationType
+from config.trading_mode import TradingMode
 
 class NotificationHandler:
     _executor = ThreadPoolExecutor(max_workers=3)
 
-    def __init__(self, urls: Optional[List[str]] = None):
+    def __init__(self, urls: Optional[List[str]], trading_mode: TradingMode):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.enabled = bool(urls)
+        self.enabled = bool(urls) and trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}
         self.lock = asyncio.Lock()
         self.apprise_instance = apprise.Apprise() if self.enabled else None
         

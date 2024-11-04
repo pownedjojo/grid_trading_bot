@@ -48,7 +48,8 @@ class GridTradingBot:
             self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
             self.order_book = OrderBook()
             notification_urls = os.getenv("APPRISE_NOTIFICATION_URLS", "").split(",")
-            self.notification_handler = NotificationHandler(notification_urls)
+            self.notification_handler = NotificationHandler(notification_urls, self.trading_mode)
+
             self.order_manager = OrderManager(
                 self.config_manager,
                 self.grid_manager,

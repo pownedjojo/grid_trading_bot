@@ -3,29 +3,31 @@ from unittest.mock import patch, Mock, AsyncMock
 from core.order_handling.order import Order, OrderType
 from utils.notification.notification_handler import NotificationHandler
 from utils.notification.notification_content import NotificationType
+from config.trading_mode import TradingMode
 
 @pytest.mark.asyncio
 class TestNotificationHandler:
     @pytest.fixture
     def notification_handler_enabled(self):
         urls = ["json://localhost:8080/path"]
-        handler = NotificationHandler(urls=urls)
+        trading_mode = TradingMode.LIVE
+        handler = NotificationHandler(urls=urls, trading_mode=trading_mode)
         handler.enabled = True
         return handler
 
     @pytest.fixture
     def notification_handler_disabled(self):
-        return NotificationHandler(urls=None)
+        return NotificationHandler(urls=None, trading_mode=TradingMode.BACKTEST)
 
     @patch("apprise.Apprise")
     def test_notification_handler_enabled_initialization(self, mock_apprise):
-        handler = NotificationHandler(urls=["mock://example.com"])
+        handler = NotificationHandler(urls=["mock://example.com"], trading_mode=TradingMode.LIVE)
         assert handler.enabled is True
         mock_apprise.return_value.add.assert_called_once_with("mock://example.com")
 
     @patch("apprise.Apprise")
     def test_notification_handler_disabled_initialization(self, mock_apprise):
-        handler = NotificationHandler(urls=None)
+        handler = NotificationHandler(urls=None, trading_mode=TradingMode.BACKTEST)
         assert handler.enabled is False
         mock_apprise.assert_not_called()
 

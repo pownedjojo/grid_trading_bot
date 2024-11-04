@@ -1,8 +1,8 @@
+import logging
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
 from main import run_bot_with_config
 from concurrent.futures import ThreadPoolExecutor
-import logging
 
 def main():
     args = parse_and_validate_console_args()

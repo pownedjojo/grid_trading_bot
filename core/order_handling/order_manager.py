@@ -9,6 +9,8 @@ from ..grid_management.grid_level import GridLevel
 from ..validation.transaction_validator import TransactionValidator
 from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 from .execution_strategy.order_execution_strategy import OrderExecutionStrategy
+from utils.notification.notification_handler import NotificationHandler
+from utils.notification.notification_content import NotificationType
 
 class OrderManager:
     def __init__(
@@ -18,7 +20,8 @@ class OrderManager:
         transaction_validator: TransactionValidator, 
         balance_tracker: BalanceTracker, 
         order_book: OrderBook,
-        order_execution_strategy: OrderExecutionStrategy
+        order_execution_strategy: OrderExecutionStrategy,
+        notification_handler: NotificationHandler
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config_manager = config_manager
@@ -27,6 +30,7 @@ class OrderManager:
         self.balance_tracker = balance_tracker
         self.order_book = order_book
         self.order_execution_strategy = order_execution_strategy
+        self.notification_handler = notification_handler
 
     async def execute_order(self, order_type: OrderType, current_price: float, previous_price: float, timestamp: Union[int, str]) -> None:
         grid_price = self.grid_manager.detect_grid_level_crossing(current_price, previous_price, sell=(order_type == OrderType.SELL))
@@ -42,29 +46,37 @@ class OrderManager:
             await self._process_sell_order(grid_level_crossed, current_price, timestamp)
     
     async def execute_take_profit_or_stop_loss_order(self, current_price: float, timestamp: Union[int, str], take_profit_order: bool = False, stop_loss_order: bool = False) -> None:
-        if take_profit_order or stop_loss_order:
-            try:
-                event = "Take profit" if take_profit_order else "Stop loss"
-                order_result = await self.order_execution_strategy.execute_order(
-                    OrderType.SELL, 
-                    self.config_manager.get_pair(), 
-                    self.balance_tracker.crypto_balance, 
-                    current_price
-                )
+        if not (take_profit_order or stop_loss_order):
+            self.logger.warning("No take profit or stop loss action specified.")
+            return
 
-                order = Order(
-                    price=order_result.get('price', current_price),
-                    quantity=order_result.get('filled_qty', self.balance_tracker.crypto_balance),
-                    order_type=OrderType.SELL,
-                    timestamp=order_result.get('timestamp', timestamp)
-                )
+        event = "Take profit" if take_profit_order else "Stop loss"
 
-                self.order_book.add_order(order)
-                await self.balance_tracker.update_after_sell(order.quantity, order.price)
-                self.logger.info(f"{event} triggered at {current_price} and sell order executed.")
+        try:
+            order_result = await self.order_execution_strategy.execute_order(
+                OrderType.SELL, 
+                self.config_manager.get_pair(), 
+                self.balance_tracker.crypto_balance, 
+                current_price
+            )
             
-            except Exception as e:
-                self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
+            order = Order(
+                price=order_result.get('price', "N/A"),
+                quantity=order_result.get('filled_qty', "N/A"),
+                order_type=OrderType.SELL,
+                timestamp=order_result.get('timestamp', "N/A")
+            )
+            
+            self.order_book.add_order(order)
+            await self.balance_tracker.update_after_sell(order.quantity, order.price)
+            await self.notification_handler.async_send_notification(
+                NotificationType.TAKE_PROFIT_TRIGGERED if take_profit_order else NotificationType.STOP_LOSS_TRIGGERED,
+                order_details=str(order)
+            )            
+            self.logger.info(f"{event} triggered at {current_price} and sell order executed.")
+        
+        except Exception as e:
+            self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
 
     async def _process_buy_order(self, grid_level: GridLevel, current_price: float, timestamp: Union[int, str]) -> None:
         try:
@@ -115,15 +127,17 @@ class OrderManager:
             order_result = await self.order_execution_strategy.execute_order(order_type, self.config_manager.get_pair(), quantity, current_price)
 
             order = Order(
-                price=order_result.get('price', current_price),
-                quantity=order_result.get('filled_qty', quantity),
+                price=order_result.get('price', "N/A"),
+                quantity=order_result.get('filled_qty', "N/A"),
                 order_type=order_type,
-                timestamp=order_result.get('timestamp', timestamp)
+                timestamp=order_result.get('timestamp', "N/A")
             )
 
-            if order_result.get('status') == 'filled' or order_result.get('status') == 'partially_filled':
-                await self._handle_order_placement(order, grid_level, order_type)
+            if order_result.get('status') == 'filled':
+                await self._handle_order_placement(order, grid_level, order_type)              
+                await self.notification_handler.async_send_notification(NotificationType.ORDER_PLACED, order_details=str(order))
             else:
+                await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details="Order could not be fully filled")
                 self.logger.warning(f"Order could not be fully filled. Status: {order_result.get('status')}")
 
         except Exception as e:

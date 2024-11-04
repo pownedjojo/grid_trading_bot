@@ -67,13 +67,20 @@ class TradingPerformanceAnalyzer:
     def _calculate_sharpe_ratio(self, data: pd.DataFrame) -> float:
         returns = data['account_value'].pct_change(fill_method=None)
         excess_returns = returns - ANNUAL_RISK_FREE_RATE / 252 # Adjusted daily
-        sharpe_ratio = excess_returns.mean() / excess_returns.std() * np.sqrt(252)
+        std_dev = excess_returns.std()
+        if std_dev == 0:
+            return 0.0
+        sharpe_ratio = excess_returns.mean() / std_dev * np.sqrt(252)
         return round(sharpe_ratio, 2)
     
     def _calculate_sortino_ratio(self, data: pd.DataFrame) -> float:
         returns = data['account_value'].pct_change(fill_method=None)
         excess_returns = returns - ANNUAL_RISK_FREE_RATE / 252  # Adjusted daily
         downside_returns = excess_returns[excess_returns < 0]
+        
+        if len(downside_returns) == 0 or downside_returns.std() == 0:
+            return round(excess_returns.mean() * np.sqrt(252), 2)  # Positive ratio if no downside
+        
         sortino_ratio = excess_returns.mean() / downside_returns.std() * np.sqrt(252)
         return round(sortino_ratio, 2)
 

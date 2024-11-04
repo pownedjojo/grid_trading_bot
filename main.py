@@ -1,6 +1,7 @@
-import logging, traceback, cProfile, asyncio
+import logging, traceback, cProfile, asyncio, os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any
+from dotenv import load_dotenv
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
 from core.bot_controller.bot_controller import BotController
@@ -21,6 +22,7 @@ from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
 from config.trading_mode import TradingMode
 from utils.logging_config import setup_logging
+from utils.notification.notification_handler import NotificationHandler
 
 class GridTradingBot:
     def __init__(self, config_path: str, save_performance_results_path: Optional[str] = None, no_plot: bool = False):
@@ -45,13 +47,16 @@ class GridTradingBot:
             self.fee_calculator = FeeCalculator(self.config_manager)
             self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
             self.order_book = OrderBook()
+            notification_urls = os.getenv("APPRISE_NOTIFICATION_URLS", "").split(",")
+            self.notification_handler = NotificationHandler(notification_urls)
             self.order_manager = OrderManager(
                 self.config_manager,
                 self.grid_manager,
                 self.transaction_validator,
                 self.balance_tracker,
                 self.order_book,
-                self.order_execution_strategy
+                self.order_execution_strategy,
+                self.notification_handler
             )
             self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
             self.plotter = Plotter(self.grid_manager, self.order_book) if self.trading_mode == TradingMode.BACKTEST else None
@@ -121,6 +126,7 @@ async def run_bot_with_config(
     save_performance_results_path: Optional[str] = None, 
     no_plot: bool = False
 ) -> Optional[Dict[str, Any]]:
+    load_dotenv()
     bot = GridTradingBot(config_path, save_performance_results_path, no_plot)
     bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.trading_performance_analyzer)
 

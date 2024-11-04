@@ -148,7 +148,7 @@ class ConfigManager:
     def get_stop_loss_threshold(self):
         stop_loss = self.get_stop_loss()
         return stop_loss.get('threshold', None)
-    
+
     # --- Logging Accessor Methods ---
     def get_logging(self):
         return self.config.get('logging', {})

@@ -35,7 +35,7 @@ class Order:
         return self.state == OrderState.COMPLETED
     
     def __str__(self) -> str:
-        return f"Order({self.order_type}, price={self.price}, quantity={self.quantity}, timestamp={self.timestamp}, state={self.state})"
+        return f"({self.order_type} Order, price={self.price}, quantity={self.quantity}, timestamp={self.timestamp}, state={self.state})"
 
     def __repr__(self) -> str:
         return self.__str__()

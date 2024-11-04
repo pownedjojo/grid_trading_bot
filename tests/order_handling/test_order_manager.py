@@ -1,13 +1,15 @@
 from unittest.mock import Mock, patch, AsyncMock
 import pytest
 from core.order_handling.order_manager import OrderManager
-from core.order_handling.order import OrderType
+from core.order_handling.order import Order, OrderType
 from core.grid_management.grid_level import GridLevel
 from core.services.exchange_interface import ExchangeInterface
 from config.trading_mode import TradingMode
 from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
 from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
 from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
+from utils.notification.notification_handler import NotificationHandler
+from utils.notification.notification_content import NotificationType
 
 class TestOrderManager:
     @pytest.fixture
@@ -16,8 +18,9 @@ class TestOrderManager:
             'config_manager': Mock(),
             'grid_manager': Mock(),
             'transaction_validator': Mock(),
-            'balance_tracker': Mock(),
-            'order_book': Mock()
+            'balance_tracker': AsyncMock(),
+            'order_book': Mock(), 
+            'notification_handler': AsyncMock()
         }
 
     @pytest.fixture
@@ -37,6 +40,7 @@ class TestOrderManager:
             transaction_validator=mock_dependencies['transaction_validator'],
             balance_tracker=mock_dependencies['balance_tracker'],
             order_book=mock_dependencies['order_book'],
+            notification_handler=mock_dependencies['notification_handler'],
             order_execution_strategy=strategy
         )
 
@@ -97,6 +101,7 @@ class TestOrderManager:
             }
             order_manager.order_execution_strategy.execute_order = AsyncMock(return_value=mock_order_result)
 
+        order_placed = Order(1000, 5, OrderType.SELL, "2024-01-01T00:00:00Z")
         await order_manager.execute_order(OrderType.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
 
         mock_dependencies['grid_manager'].get_grid_level.assert_called_once_with(1000)
@@ -106,6 +111,17 @@ class TestOrderManager:
             grid_level
         )
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(buy_order.quantity, 1000)
+
+        if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
+            mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
+                NotificationType.ORDER_PLACED,
+                order_details=str( Order(1000, 5, OrderType.SELL, "2024-01-01T00:00:00Z"))
+            )
+        else:
+            mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
+                NotificationType.ORDER_PLACED,
+                order_details=str( Order(1000, 5, OrderType.SELL, "N/A"))
+            )
 
     @pytest.mark.asyncio
     async def test_execute_take_profit(self, order_manager, mock_dependencies):
@@ -126,6 +142,10 @@ class TestOrderManager:
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(5, 2000)
         mock_dependencies['order_book'].add_order.assert_called_once()
         order_added = mock_dependencies['order_book'].add_order.call_args[0][0]
+        mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
+            NotificationType.TAKE_PROFIT_TRIGGERED,
+            order_details=str(order_added)
+        )
         assert order_added.order_type == OrderType.SELL, "Expected order type to be SELL for take profit"
         assert order_added.price == 2000, "Expected order price to be 2000 for take profit"
         assert order_added.quantity == 5, "Expected order quantity to match crypto balance"
@@ -150,6 +170,10 @@ class TestOrderManager:
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(5, 1500)
         mock_dependencies['order_book'].add_order.assert_called_once()
         order_added = mock_dependencies['order_book'].add_order.call_args[0][0]
+        mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
+            NotificationType.STOP_LOSS_TRIGGERED,
+            order_details=str(order_added)
+        )
         assert order_added.order_type == OrderType.SELL, "Expected order type to be SELL for stop loss"
         assert order_added.price == 1500, "Expected order price to be 1500 for stop loss"
         assert order_added.quantity == 5, "Expected order quantity to match crypto balance"

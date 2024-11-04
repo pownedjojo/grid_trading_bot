@@ -50,12 +50,19 @@ class LiveExchangeService(ExchangeInterface):
             try:
                 self.logger.info(f"Connecting to WebSocket for {pair} price updates.")
                 async for ticker in self.exchange.watch_ticker(pair):
+
+                    if not self.connection_active:
+                        break
+
                     current_price = ticker['last']
                     timestamp = ticker['timestamp'] / 1000.0  # Convert to seconds
                     on_price_update(current_price, timestamp)
             except Exception as e:
                 self.logger.error(f"WebSocket connection error: {e}. Reconnecting...")
                 await asyncio.sleep(5)
+            finally:
+                if not self.connection_active:
+                    await self.exchange.close()
 
     async def listen_to_price_updates(self, pair: str, on_price_update: Callable[[float, float], None]):
         await self._subscribe_to_price_updates(pair, on_price_update)

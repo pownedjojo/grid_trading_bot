@@ -64,7 +64,7 @@ class OrderManager:
                 price=order_result.get('price', "N/A"),
                 quantity=order_result.get('filled_qty', "N/A"),
                 order_type=OrderType.SELL,
-                timestamp=order_result.get('timestamp', "N/A")
+                timestamp=order_result.get('timestamp', timestamp)
             )
             
             self.order_book.add_order(order)
@@ -130,7 +130,7 @@ class OrderManager:
                 price=order_result.get('price', "N/A"),
                 quantity=order_result.get('filled_qty', "N/A"),
                 order_type=order_type,
-                timestamp=order_result.get('timestamp', "N/A")
+                timestamp=order_result.get('timestamp', timestamp)
             )
 
             if order_result.get('status') == 'filled':

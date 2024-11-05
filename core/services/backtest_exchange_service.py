@@ -75,11 +75,11 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to load OHLCV data from file: {str(e)}")
 
-    def _fetch_ohlcv_single_batch(self, pair: str, timeframe, since, until) -> pd.DataFrame:
+    def _fetch_ohlcv_single_batch(self, pair: str, timeframe: str, since: int, until: int) -> pd.DataFrame:
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)
         return self._format_ohlcv(ohlcv, until)
 
-    def _fetch_ohlcv_in_chunks(self, pair: str, timeframe, since, until, candles_per_request) -> pd.DataFrame:
+    def _fetch_ohlcv_in_chunks(self, pair: str, timeframe: str, since: int, until: int, candles_per_request: int) -> pd.DataFrame:
         all_ohlcv = []
         while since < until:
             ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since, limit=candles_per_request)
@@ -90,7 +90,7 @@ class BacktestExchangeService(ExchangeInterface):
             self.logger.info(f"Fetched up to {pd.to_datetime(since, unit='ms')}")
         return self._format_ohlcv(all_ohlcv, until)
 
-    def _format_ohlcv(self, ohlcv, until) -> pd.DataFrame:
+    def _format_ohlcv(self, ohlcv, until: int) -> pd.DataFrame:
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
@@ -115,10 +115,10 @@ class BacktestExchangeService(ExchangeInterface):
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
 
-    def place_order(self, pair: str, order_type: str, amount: float, price: Optional[float] = None):
+    def place_order(self, pair: str, order_type: str, amount: float, price: Optional[float] = None) -> dict:
         raise NotImplementedError("place_order is not used in backtesting.")
 
-    def get_balance(self):
+    async def get_balance(self) -> Dict[str, Any]:
         raise NotImplementedError("get_balance is not used in backtesting.")
 
     def get_current_price(self, pair: str) -> float:

@@ -44,7 +44,7 @@ class TradingPerformanceAnalyzer:
             sell_fee = trade_value * self.trading_fee
             total_sell_revenue += trade_value - sell_fee
 
-        grid_trading_gains = total_sell_revenue - total_buy_cost
+        grid_trading_gains = f"{total_sell_revenue - total_buy_cost:.2f}" if total_sell_revenue != 0 else "N/A"
         return grid_trading_gains
 
     def _calculate_drawdown(self, data: pd.DataFrame) -> float:
@@ -156,7 +156,7 @@ class TradingPerformanceAnalyzer:
             "Time in Profit %": f"{time_in_profit:.2f}%",
             "Time in Loss %": f"{time_in_loss:.2f}%",
             "Buy and Hold Return %": f"{buy_and_hold_return:.2f}%",
-            "Grid Trading Gains": f"{grid_trading_gains:.2f}",
+            "Grid Trading Gains": f"{grid_trading_gains}",
             "Total Fees": f"{total_fees:.2f}",
             "Final Balance (Fiat)": f"{final_balance:.2f}",
             "Crypto Balance": f"{crypto_balance:.4f} {self.base_currency}",

@@ -13,6 +13,8 @@ from core.order_handling.balance_tracker import BalanceTracker
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from strategies.plotter import Plotter
 
+TICKER_REFRESH_INTERVAL = 3  # in seconds
+
 class GridTradingStrategy(TradingStrategy):
     def __init__(
         self,
@@ -76,7 +78,7 @@ class GridTradingStrategy(TradingStrategy):
         pair = self.config_manager.get_pair()
         last_price: Optional[float] = None
 
-        async def on_price_update(current_price, timestamp):
+        async def on_ticker_update(current_price, timestamp):
             nonlocal last_price
             
             if not self._running:
@@ -92,7 +94,7 @@ class GridTradingStrategy(TradingStrategy):
                 return
 
             last_price = current_price
-        await self.exchange_service.listen_to_price_updates(pair, on_price_update)
+        await self.exchange_service.listen_to_ticker_updates(pair, on_ticker_update, TICKER_REFRESH_INTERVAL)
 
     async def _run_backtest(self) -> None:
         if self.data is None:

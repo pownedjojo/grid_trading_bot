@@ -1,5 +1,6 @@
 import ccxt, logging, time, asyncio, os
-from typing import Dict, Union, Callable
+import ccxt.pro as ccxtpro
+from typing import List, Dict, Union, Callable, Any
 from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
@@ -22,9 +23,9 @@ class LiveExchangeService(ExchangeInterface):
             raise MissingEnvironmentVariableError(f"Missing required environment variable: {key}")
         return value
 
-    def _initialize_exchange(self):
+    def _initialize_exchange(self) -> None:
         try:
-            exchange = getattr(ccxt, self.exchange_name)({
+            exchange = getattr(ccxtpro, self.exchange_name)({
                 'apiKey': self.api_key,
                 'secret': self.secret_key,
                 'enableRateLimit': True
@@ -36,52 +37,82 @@ class LiveExchangeService(ExchangeInterface):
         except AttributeError:
             raise UnsupportedExchangeError(f"The exchange '{self.exchange_name}' is not supported.")
 
-    def _enable_sandbox_mode(self, exchange):
+    def _enable_sandbox_mode(self, exchange) -> None:
         if self.exchange_name == 'binance':
-            exchange.set_sandbox_mode(True)
+            exchange.urls['api'] = 'https://testnet.binance.vision/api'
         elif self.exchange_name == 'kraken':
-            exchange.urls['api'] = 'https://api.sandbox.kraken.com'
+            exchange.urls['api'] = 'https://api.demo-futures.kraken.com'
+        elif self.exchange_name == 'bitmex':
+            exchange.urls['api'] = 'https://testnet.bitmex.com'
+        elif self.exchange_name == 'bybit':
+            exchange.set_sandbox_mode(True)
         else:
             self.logger.warning(f"No sandbox mode available for {self.exchange_name}. Running in live mode.")
     
-    async def _subscribe_to_price_updates(self, pair: str, on_price_update: Callable[[float, float], None]):
+    async def _subscribe_to_ticker_updates(
+        self,
+        pair: str, 
+        on_ticker_update: Callable[[float, float], None], 
+        update_interval: float = 1.0
+    ) -> None:
         self.connection_active = True
+        
         while self.connection_active:
             try:
-                self.logger.info(f"Connecting to WebSocket for {pair} price updates.")
-                async for ticker in self.exchange.watch_ticker(pair):
+                self.logger.info(f"Connecting to WebSocket for {pair} ticker updates.")
+                ticker = await self.exchange.watch_ticker(pair)
 
-                    if not self.connection_active:
-                        break
+                if not self.connection_active:
+                    break
 
-                    current_price = ticker['last']
-                    timestamp = ticker['timestamp'] / 1000.0  # Convert to seconds
-                    on_price_update(current_price, timestamp)
+                current_price = ticker['last']
+                timestamp = ticker['timestamp'] / 1000.0  # Convert to seconds
+
+                await on_ticker_update(current_price, timestamp)
+                await asyncio.sleep(update_interval)
+
+            except ccxtpro.NetworkError as e:
+                self.logger.error(f"Network error while connecting to WebSocket: {e}. Retrying in 5 seconds...")
+                await asyncio.sleep(5)
+
+            except ccxtpro.ExchangeError as e:
+                self.logger.error(f"Exchange error while fetching ticker for {pair}: {e}. Retrying in 5 seconds...")
+                await asyncio.sleep(5)
+
             except Exception as e:
                 self.logger.error(f"WebSocket connection error: {e}. Reconnecting...")
                 await asyncio.sleep(5)
+
             finally:
                 if not self.connection_active:
+                    self.logger.info(f"Connection to Websocket no longer active.")
                     await self.exchange.close()
 
-    async def listen_to_price_updates(self, pair: str, on_price_update: Callable[[float, float], None]):
-        await self._subscribe_to_price_updates(pair, on_price_update)
+    async def listen_to_ticker_updates(
+        self, 
+        pair: str, 
+        on_price_update: Callable[[float, float], None],
+        update_interval: float = 1.0
+    ) -> None:
+        await self._subscribe_to_ticker_updates(pair, on_price_update, update_interval)
 
-    def close_connection(self):
+    async def close_connection(self) -> None:
         self.connection_active = False
 
-    async def get_balance(self):
+    async def get_balance(self) -> Dict[str, Any]:
         try:
             balance = await self.exchange.fetch_balance()
             self.logger.info(f"Retrieved balance: {balance}")
             return balance
+
         except ccxt.BaseError as e:
             raise DataFetchError(f"Error fetching balance: {str(e)}")
     
-    async def get_current_price(self, pair: str):
+    async def get_current_price(self, pair: str) -> float:
         try:
             ticker = await self.exchange.fetch_ticker(pair)
             return ticker['last']
+
         except ccxt.BaseError as e:
             raise DataFetchError(f"Error fetching current price: {str(e)}")
 
@@ -100,12 +131,15 @@ class LiveExchangeService(ExchangeInterface):
         except ValueError as e:
             self.logger.error(f"Error placing order - invalid order type specified {str(e)}")
             raise InvalidOrderTypeError(f"Error placing order: {str(e)}")
+
         except ccxt.NetworkError as e:
             self.logger.warning(f"Network error placing {order_type} order for {pair}: {str(e)}.")
             raise DataFetchError(f"Network issue occurred while placing order: {str(e)}")
+
         except ccxt.BaseError as e:
             self.logger.error(f"Exchange error placing {order_type} order for {pair}: {str(e)}")
             raise DataFetchError(f"Error placing order: {str(e)}")
+
         except Exception as e:
             self.logger.error(f"Unexpected error placing {order_type} order: {str(e)}")
             raise DataFetchError(f"Unexpected error placing order: {str(e)}")
@@ -118,9 +152,11 @@ class LiveExchangeService(ExchangeInterface):
         except ccxt.NetworkError as e:
             self.logger.error(f"Network error while fetching order {order_id}: {str(e)}")
             raise DataFetchError(f"Network issue occurred while fetching order status: {str(e)}")
+
         except ccxt.BaseError as e:
             self.logger.error(f"Exchange error while fetching order {order_id}: {str(e)}")
             raise DataFetchError(f"Exchange-specific error occurred: {str(e)}")
+
         except Exception as e:
             self.logger.error(f"Unexpected error while fetching order {order_id}: {str(e)}")
             raise DataFetchError(f"Failed to fetch order status: {str(e)}")
@@ -138,21 +174,20 @@ class LiveExchangeService(ExchangeInterface):
                 return cancellation_result
 
         except ccxt.OrderNotFound as e:
-            error_msg = f"Order {order_id} not found for cancellation. It may already be completed or canceled."
-            self.logger.warning(error_msg)
-            raise OrderCancellationError(error_msg) from e
-        except ccxt.NetworkError as e:
-            error_msg = f"Network error while canceling order {order_id}: {str(e)}"
-            self.logger.error(error_msg)
-            raise OrderCancellationError(error_msg) from e
-        except ccxt.BaseError as e:
-            error_msg = f"Exchange error while canceling order {order_id}: {str(e)}"
-            self.logger.error(error_msg)
-            raise OrderCancellationError(error_msg) from e
-        except Exception as e:
-            error_msg = f"Unexpected error while canceling order {order_id}: {str(e)}"
-            self.logger.error(error_msg)
+            self.logger.warning(f"Order {order_id} not found for cancellation. It may already be completed or canceled.")
             raise OrderCancellationError(error_msg) from e
 
-    def fetch_ohlcv(self, pair, timeframe, start_date, end_date):
+        except ccxt.NetworkError as e:
+            self.logger.error(f"Network error while canceling order {order_id}: {str(e)}")
+            raise OrderCancellationError(error_msg) from e
+
+        except ccxt.BaseError as e:
+            self.logger.error(f"Exchange error while canceling order {order_id}: {str(e)}")
+            raise OrderCancellationError(error_msg) from e
+
+        except Exception as e:
+            self.logger.error(f"Unexpected error while canceling order {order_id}: {str(e)}")
+            raise OrderCancellationError(error_msg) from e
+
+    def fetch_ohlcv(self, pair: str, timeframe: str, start_date: str, end_date: str) -> List[Dict[str, Union[float, int]]]:
         raise NotImplementedError("fetch_ohlcv is not used in live or paper trading mode.")

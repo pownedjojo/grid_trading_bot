@@ -4,7 +4,7 @@ import pandas as pd
 from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
-from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError, HistoricalMarketDataFileNotFoundError
+from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError, HistoricalMarketDataFileNotFoundError, UnsupportedPairError
 
 class BacktestExchangeService(ExchangeInterface):
     def __init__(self, config_manager: ConfigManager):
@@ -25,14 +25,21 @@ class BacktestExchangeService(ExchangeInterface):
             self.logger.warning(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
             return False
         return True
+    
+    def _is_pair_supported(self, pair: str) -> bool:
+        markets = self.exchange.load_markets()
+        return pair in markets
 
-    def fetch_ohlcv(self, pair, timeframe, start_date, end_date) -> pd.DataFrame:
+    def fetch_ohlcv(self, pair: str, timeframe: str, start_date: str, end_date: str) -> pd.DataFrame:
         if self.historical_data_file:
             if not os.path.exists(self.historical_data_file):
                 raise HistoricalMarketDataFileNotFoundError(f"Failed to load OHLCV data from file: {self.historical_data_file}")
     
             self.logger.info(f"Loading OHLCV data from file: {self.historical_data_file}")
             return self._load_ohlcv_from_file(self.historical_data_file, start_date, end_date)
+        
+        if not self._is_pair_supported(pair):
+            raise UnsupportedPairError(f"Pair: {pair} is not supported by {self.exchange_name}")
 
         if not self._is_timeframe_supported(timeframe):
             raise UnsupportedTimeframeError(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
@@ -55,7 +62,7 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to fetch OHLCV data {str(e)}.")
     
-    def _load_ohlcv_from_file(self, file_path, start_date, end_date) -> pd.DataFrame:
+    def _load_ohlcv_from_file(self, file_path: str, start_date: str, end_date: str) -> pd.DataFrame:
         try:
             df = pd.read_csv(file_path, parse_dates=['timestamp'])
             df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -68,11 +75,11 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to load OHLCV data from file: {str(e)}")
 
-    def _fetch_ohlcv_single_batch(self, pair, timeframe, since, until) -> pd.DataFrame:
+    def _fetch_ohlcv_single_batch(self, pair: str, timeframe, since, until) -> pd.DataFrame:
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)
         return self._format_ohlcv(ohlcv, until)
 
-    def _fetch_ohlcv_in_chunks(self, pair, timeframe, since, until, candles_per_request) -> pd.DataFrame:
+    def _fetch_ohlcv_in_chunks(self, pair: str, timeframe, since, until, candles_per_request) -> pd.DataFrame:
         all_ohlcv = []
         while since < until:
             ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since, limit=candles_per_request)
@@ -93,7 +100,7 @@ class BacktestExchangeService(ExchangeInterface):
     def _get_candle_limit(self) -> int:
         return CANDLE_LIMITS.get(self.exchange_name, 500)  # Default to 500 if not found
 
-    def _get_timeframe_in_ms(self, timeframe) -> int:
+    def _get_timeframe_in_ms(self, timeframe: str) -> int:
         return TIMEFRAME_MAPPINGS.get(timeframe, 60 * 1000)  # Default to 1m if not found
 
     def _fetch_with_retry(self, method, *args, retries=3, delay=5, **kwargs):
@@ -108,7 +115,7 @@ class BacktestExchangeService(ExchangeInterface):
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
 
-    def place_order(self, pair, order_type, amount, price=None):
+    def place_order(self, pair: str, order_type: str, amount: float, price: Optional[float] = None):
         raise NotImplementedError("place_order is not used in backtesting.")
 
     def get_balance(self):

@@ -54,7 +54,7 @@ class TestPerformanceAnalyzer:
         order_book.get_all_sell_orders.return_value = [Order(order_type=OrderType.SELL, price=1200, quantity=1, timestamp="2024-01-02T00:00:00Z")]
 
         trading_gains = analyzer._calculate_trading_gains()
-        assert trading_gains == approx(197.8, rel=1e-3)  # Adjusted expected value
+        assert trading_gains == "197.80"
 
     def test_calculate_trading_gains_zero_trades(self, setup_performance_analyzer):
         analyzer, _, order_book = setup_performance_analyzer
@@ -62,7 +62,7 @@ class TestPerformanceAnalyzer:
         order_book.get_all_sell_orders.return_value = []
 
         trading_gains = analyzer._calculate_trading_gains()
-        assert trading_gains == 0.0  # Expected 0 gains with no trades
+        assert trading_gains == "N/A"
 
     def test_calculate_sharpe_ratio(self, setup_performance_analyzer, mock_account_data):
         analyzer, _, _ = setup_performance_analyzer

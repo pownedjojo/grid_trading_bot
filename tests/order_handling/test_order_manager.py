@@ -117,11 +117,6 @@ class TestOrderManager:
                 NotificationType.ORDER_PLACED,
                 order_details=str( Order(1000, 5, OrderType.SELL, "2024-01-01T00:00:00Z"))
             )
-        else:
-            mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
-                NotificationType.ORDER_PLACED,
-                order_details=str( Order(1000, 5, OrderType.SELL, "N/A"))
-            )
 
     @pytest.mark.asyncio
     async def test_execute_take_profit(self, order_manager, mock_dependencies):

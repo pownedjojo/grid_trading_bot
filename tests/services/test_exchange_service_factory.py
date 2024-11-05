@@ -15,21 +15,21 @@ class TestExchangeServiceFactory:
         config_manager.get_exchange_name.return_value = "binance"
         return config_manager
     
-    @patch("core.services.live_exchange_service.ccxt")
+    @patch("core.services.live_exchange_service.ccxtpro")
     @patch("core.services.live_exchange_service.getattr")
-    def test_create_live_exchange_service_with_env_vars(self, mock_getattr, mock_ccxt, config_manager, monkeypatch):
+    def test_create_live_exchange_service_with_env_vars(self, mock_getattr, mock_ccxtpro, config_manager, monkeypatch):
         monkeypatch.setenv("EXCHANGE_API_KEY", "test_api_key")
         monkeypatch.setenv("EXCHANGE_SECRET_KEY", "test_secret_key")
 
         mock_exchange_instance = Mock()
-        mock_ccxt.binance.return_value = mock_exchange_instance
-        mock_getattr.return_value = mock_ccxt.binance
+        mock_ccxtpro.binance.return_value = mock_exchange_instance
+        mock_getattr.return_value = mock_ccxtpro.binance
 
         service = ExchangeServiceFactory.create_exchange_service(config_manager, TradingMode.LIVE)
 
         assert isinstance(service, LiveExchangeService), "Expected a LiveExchangeService instance"
-        mock_getattr.assert_called_once_with(mock_ccxt, "binance")
-        mock_ccxt.binance.assert_called_once_with({
+        mock_getattr.assert_called_once_with(mock_ccxtpro, "binance")
+        mock_ccxtpro.binance.assert_called_once_with({
             'apiKey': "test_api_key",
             'secret': "test_secret_key",
             'enableRateLimit': True

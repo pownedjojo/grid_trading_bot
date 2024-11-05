@@ -118,7 +118,7 @@ class BacktestExchangeService(ExchangeInterface):
     def place_order(self, pair: str, order_type: str, amount: float, price: Optional[float] = None) -> dict:
         raise NotImplementedError("place_order is not used in backtesting.")
 
-    async def get_balance(self) -> Dict[str, Any]:
+    def get_balance(self) -> Dict[str, Any]:
         raise NotImplementedError("get_balance is not used in backtesting.")
 
     def get_current_price(self, pair: str) -> float:

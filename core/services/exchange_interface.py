@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Union, List, Optional
+from typing import Dict, Union, List, Optional, Any
 
 class ExchangeInterface(ABC):
     @abstractmethod
-    def get_balance(self) -> Dict[str, float]:
+    async def get_balance(self) -> Dict[str, Any]:
         """Fetches the account balance, returning a dictionary with fiat and crypto balances."""
         pass
     

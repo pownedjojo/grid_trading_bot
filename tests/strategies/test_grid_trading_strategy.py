@@ -107,11 +107,11 @@ class TestGridTradingStrategy:
         create_strategy, config_manager, exchange_service, *_ = setup_strategy
         config_manager.get_trading_mode.return_value = TradingMode.LIVE
         strategy = create_strategy()
-        exchange_service.listen_to_price_updates = AsyncMock()
+        exchange_service.listen_to_ticker_updates = AsyncMock()
 
         await strategy.run()
 
-        exchange_service.listen_to_price_updates.assert_called_once()
+        exchange_service.listen_to_ticker_updates.assert_called_once()
 
     # async def test_execute_take_profit(self, setup_strategy):
     #     strategy, config_manager, _, order_manager, balance_tracker, *_ = setup_strategy

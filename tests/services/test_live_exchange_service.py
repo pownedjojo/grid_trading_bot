@@ -1,5 +1,5 @@
 import pytest, ccxt
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from core.services.live_exchange_service import LiveExchangeService
 from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError, OrderCancellationError, InvalidOrderTypeError
 from config.config_manager import ConfigManager
@@ -65,13 +65,16 @@ class TestLiveExchangeService:
     def test_sandbox_mode_initialization(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars):
         config_manager.get_trading_mode.return_value = TradingMode.PAPER_TRADING
 
-        mock_exchange_instance = Mock()
+        mock_exchange_instance = MagicMock()
+        mock_exchange_instance.urls = {'api': 'https://api.binance.com'}  # Initial URL setup
         mock_ccxt.binance.return_value = mock_exchange_instance
         mock_getattr.return_value = mock_ccxt.binance
 
         service = LiveExchangeService(config_manager, is_paper_trading_activated=True)
+
         assert service.is_paper_trading_activated is True
-        mock_exchange_instance.set_sandbox_mode.assert_called_once_with(True)
+        expected_sandbox_url = "https://testnet.binance.vision/api"
+        assert mock_exchange_instance.urls['api'] == expected_sandbox_url, "Sandbox URL not correctly set for Binance."
 
     @patch("core.services.live_exchange_service.getattr")
     def test_unsupported_exchange_raises_error(self, mock_getattr, config_manager, setup_env_vars):

@@ -1,9 +1,11 @@
+import logging
 from typing import List, Optional, Tuple, Union
 import numpy as np
 from .grid_level import GridLevel, GridCycleState
 
 class GridManager:
     def __init__(self, config_manager):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.config_manager = config_manager
         self.initial_balance: float = self.config_manager.get_initial_balance()
         self.grids: List[float]
@@ -40,7 +42,7 @@ class GridManager:
     
     async def reset_grid_cycle(self, buy_grid_level: GridLevel) -> None:
         buy_grid_level.reset_buy_level_cycle()
-        self.logger.info(f"Buy Grid level at price {buy_grid_level.price} is reset and ready for the next buy/sell cycle.")
+        self.logger.debug(f"Buy Grid level at price {buy_grid_level.price} is reset and ready for the next buy/sell cycle.")
 
     def _extract_grid_config(self) -> Tuple[float, float, int, str, float]:
         bottom_range = self.config_manager.get_bottom_range()

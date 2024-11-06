@@ -64,18 +64,23 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
             self.logger.error(f"Unable to cancel partially filled order {order_result['id']} after retries.")
             order_result['status'] = 'partially_filled'
             return order_result
+
         return None
 
     async def _retry_cancel_order(self, order_id: str, pair: str) -> bool:
         for cancel_attempt in range(self.max_retries):
             try:
                 cancel_result = await self.exchange_service.cancel_order(order_id, pair)
+
                 if cancel_result['status'] == 'canceled':
                     self.logger.info(f"Successfully canceled order {order_id}.")
                     return True
+
                 self.logger.warning(f"Cancel attempt {cancel_attempt + 1} for order {order_id} failed.")
+
             except Exception as e:
                 self.logger.warning(f"Error during cancel attempt {cancel_attempt + 1} for order {order_id}: {str(e)}")
+
             await asyncio.sleep(self.retry_delay)
         return False
 

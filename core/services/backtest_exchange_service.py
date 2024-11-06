@@ -22,7 +22,7 @@ class BacktestExchangeService(ExchangeInterface):
     
     def _is_timeframe_supported(self, timeframe: str) -> bool:
         if timeframe not in self.exchange.timeframes:
-            self.logger.warning(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
+            self.logger.error(f"Timeframe '{timeframe}' is not supported by {self.exchange_name}.")
             return False
         return True
     
@@ -70,8 +70,9 @@ class BacktestExchangeService(ExchangeInterface):
             start_timestamp = pd.to_datetime(start_date).tz_localize(None)
             end_timestamp = pd.to_datetime(end_date).tz_localize(None)
             filtered_df = df.loc[start_timestamp:end_timestamp]
-            self.logger.info(f"Loaded {len(filtered_df)} rows of OHLCV data from file.")
+            self.logger.debug(f"Loaded {len(filtered_df)} rows of OHLCV data from file.")
             return filtered_df
+            
         except Exception as e:
             raise DataFetchError(f"Failed to load OHLCV data from file: {str(e)}")
 

@@ -38,4 +38,4 @@ class NotificationHandler:
     async def async_send_notification(self, content: Union[NotificationType, str], **kwargs) -> None:
         async with self.lock:  # Ensures no overlapping calls
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(self._executor, self.send_notification, content, **kwargs)
+            await loop.run_in_executor(self._executor, lambda: self.send_notification(content, **kwargs))

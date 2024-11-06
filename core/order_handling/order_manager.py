@@ -36,7 +36,7 @@ class OrderManager:
         grid_price = self.grid_manager.detect_grid_level_crossing(current_price, previous_price, sell=(order_type == OrderType.SELL))
 
         if grid_price is None:
-            self.logger.info(f"No grid level crossed for {order_type}.")
+            self.logger.debug(f"No grid level crossed for {order_type}.")
             return
         
         grid_level_crossed = self.grid_manager.get_grid_level(grid_price)
@@ -73,7 +73,7 @@ class OrderManager:
                 NotificationType.TAKE_PROFIT_TRIGGERED if take_profit_order else NotificationType.STOP_LOSS_TRIGGERED,
                 order_details=str(order)
             )            
-            self.logger.info(f"{event} triggered at {current_price} and sell order executed.")
+            self.logger.debug(f"{event} triggered at {current_price} and sell order executed.")
         
         except Exception as e:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
@@ -86,9 +86,13 @@ class OrderManager:
                 self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
                 await self._verify_order_conditions(grid_level, OrderType.BUY)
                 await self._place_order(grid_level, OrderType.BUY, current_price, quantity, timestamp)
+            
+        except GridLevelNotReadyError as e:
+            self.logger.debug(f"Cannot process buy order: {e}")
 
-        except (InsufficientBalanceError, GridLevelNotReadyError) as e:
-            self.logger.info(f"Cannot process buy order: {e}")
+        except InsufficientBalanceError as e:
+            self.logger.warning(f"Cannot process buy order: {e}")
+
         except Exception as e:
             self.logger.error(f"Unexpected error while processing buy order: {e}")
     
@@ -96,7 +100,7 @@ class OrderManager:
         buy_grid_level = self.grid_manager.find_lowest_completed_buy_grid()
 
         if buy_grid_level is None:
-            self.logger.info(f"No grid level found with a completed buy order.")
+            self.logger.debug(f"No grid level found with a completed buy order.")
             return
 
         try:
@@ -108,9 +112,13 @@ class OrderManager:
                 await self._verify_order_conditions(grid_level, OrderType.SELL)
                 await self._place_order(grid_level, OrderType.SELL, current_price, quantity, timestamp)
                 await self.grid_manager.reset_grid_cycle(buy_grid_level)
+        
+        except GridLevelNotReadyError as e:
+            self.logger.debug(f"Cannot process sell order: {e}")
 
-        except (GridLevelNotReadyError, InsufficientCryptoBalanceError) as e:
-            self.logger.info(f"Cannot process sell order: {e}")
+        except InsufficientBalanceError as e:
+            self.logger.warning(f"Cannot process sell order: {e}")
+
         except Exception as e:
             self.logger.error(f"Unexpected error while processing sell order: {e}")
 
@@ -152,4 +160,4 @@ class OrderManager:
             await self.balance_tracker.update_after_sell(order.quantity, order.price)
         
         self.order_book.add_order(order, grid_level)
-        self.logger.info(f"{order_type} order placed at {order.price} for grid level {grid_level.price}.")
+        self.logger.debug(f"{order_type} order placed at {order.price} for grid level {grid_level.price}.")

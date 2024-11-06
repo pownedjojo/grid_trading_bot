@@ -40,10 +40,9 @@ class GridTradingStrategy(TradingStrategy):
     def _initialize_data(self) -> Optional[pd.DataFrame]:
         try:
             pair, timeframe, start_date, end_date = self._extract_config()
-            self.logger.info(f"Fetching OHLCV data for backtest: {pair}, {timeframe} from {start_date} to {end_date}")
             return self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
         except Exception as e:
-            self.logger.error(f"Failed to initialize data for backtest: {e}")
+            self.logger.error(f"Failed to initialize data for backtest trading mode: {e}")
             return None
     
     def _extract_config(self) -> Tuple[str, str, str, str]:
@@ -70,6 +69,7 @@ class GridTradingStrategy(TradingStrategy):
     async def run(self):
         if self.trading_mode == TradingMode.BACKTEST:
             await self._run_backtest()
+            self.logger.info("Ending backtest simulation")
         else:
             await self._run_live_or_paper_trading()
     

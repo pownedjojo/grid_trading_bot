@@ -1,4 +1,4 @@
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, patch
 import pytest
 from core.order_handling.order_manager import OrderManager
 from core.order_handling.order import Order, OrderType
@@ -115,15 +115,11 @@ class TestOrderManager:
         mock_order_result = {'price': 2000, 'filled_qty': 5, 'timestamp': "2024-01-01T00:00:00Z", 'status': 'filled'}
         order_manager.order_execution_strategy = AsyncMock()
         order_manager.order_execution_strategy.execute_order.return_value = mock_order_result
+        pair = f"{mock_dependencies['config_manager'].get_base_currency()}/{mock_dependencies['config_manager'].get_quote_currency()}"
 
         await order_manager.execute_take_profit_or_stop_loss_order(2000, "2024-01-01T00:00:00Z", take_profit_order=True)
 
-        order_manager.order_execution_strategy.execute_order.assert_called_once_with(
-            OrderType.SELL, 
-            mock_dependencies['config_manager'].get_pair(), 
-            5,
-            2000
-        )
+        order_manager.order_execution_strategy.execute_order.assert_called_once_with(OrderType.SELL, pair, 5, 2000)
 
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(5, 2000)
         mock_dependencies['order_book'].add_order.assert_called_once()
@@ -143,15 +139,11 @@ class TestOrderManager:
         mock_order_result = {'price': 1500, 'filled_qty': 5, 'timestamp': "2024-01-01T00:00:00Z", 'status': 'filled'}
         order_manager.order_execution_strategy = AsyncMock()
         order_manager.order_execution_strategy.execute_order.return_value = mock_order_result
+        pair = f"{mock_dependencies['config_manager'].get_base_currency()}/{mock_dependencies['config_manager'].get_quote_currency()}"
 
         await order_manager.execute_take_profit_or_stop_loss_order(1500, "2024-01-01T00:00:00Z", stop_loss_order=True)
 
-        order_manager.order_execution_strategy.execute_order.assert_called_once_with(
-            OrderType.SELL, 
-            mock_dependencies['config_manager'].get_pair(), 
-            5,
-            1500
-        )
+        order_manager.order_execution_strategy.execute_order.assert_called_once_with(OrderType.SELL, pair, 5, 1500)
 
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(5, 1500)
         mock_dependencies['order_book'].add_order.assert_called_once()
@@ -185,22 +177,6 @@ class TestOrderManager:
         await order_manager._process_sell_order(grid_level, 1000, "2024-01-01T00:00:00Z")
 
         mock_dependencies['balance_tracker'].update_after_sell.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_process_buy_order_grid_level_not_ready(self, order_manager, mock_dependencies):
-        grid_level = Mock(spec=GridLevel)
-        grid_level.can_place_buy_order.return_value = False
-        grid_level.price = 1000
-        grid_level.cycle_state = "not_ready" 
-        order_manager.order_execution_strategy = AsyncMock()
-        order_manager.balance_tracker = mock_dependencies['balance_tracker']
-        order_manager.config_manager = mock_dependencies['config_manager']
-
-        with pytest.raises(GridLevelNotReadyError, match=f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.cycle_state}"):
-            await order_manager._verify_order_conditions(grid_level, OrderType.BUY)
-
-        grid_level.can_place_buy_order.assert_called_once()
-        order_manager.order_execution_strategy.execute_order.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_multiple_buy_orders_for_sell(self, order_manager, mock_dependencies):

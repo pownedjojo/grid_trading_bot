@@ -1,4 +1,4 @@
-import logging
+import logging, asyncio
 from typing import Union
 from .order import Order, OrderType
 from ..order_handling.balance_tracker import BalanceTracker
@@ -32,6 +32,7 @@ class OrderManager:
         self.order_book = order_book
         self.order_execution_strategy = order_execution_strategy
         self.notification_handler = notification_handler
+        self.finalize_order_placement_lock = asyncio.Lock()
 
     async def execute_order(
         self, 
@@ -88,8 +89,13 @@ class OrderManager:
             )            
             self.logger.debug(f"{event} triggered at {current_price} and sell order executed.")
         
+        except OrderExecutionFailedError as e:
+            self.logger.error(f"Order execution failed: {str(e)}")
+            await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place {event} order: {e}")
+        
         except Exception as e:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
+            await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place {event} order: {e}")
 
     async def _process_buy_order(
         self, 
@@ -105,10 +111,10 @@ class OrderManager:
                 await self._place_order(grid_level, OrderType.BUY, current_price, quantity, timestamp)
             
         except GridLevelNotReadyError as e:
-            self.logger.debug(f"Cannot process buy order: {e}")
+            self.logger.debug(f"{e}")
 
         except InsufficientBalanceError as e:
-            self.logger.warning(f"Cannot process buy order: {e}")
+            self.logger.warning(e)
         
         except OrderExecutionFailedError as e:
             self.logger.error(f"Order execution failed: {str(e)}")
@@ -181,12 +187,13 @@ class OrderManager:
         grid_level: GridLevel, 
         order_type: OrderType
     ) -> None:
-        if order_type == OrderType.BUY:
-            grid_level.place_buy_order(order)
-            await self.balance_tracker.update_after_buy(order.quantity, order.price)
-        else:
-            grid_level.place_sell_order(order)
-            await self.balance_tracker.update_after_sell(order.quantity, order.price)
-        
-        self.order_book.add_order(order, grid_level)
-        self.logger.debug(f"{order_type} order placed at {order.price} for grid level {grid_level.price}.")
+        async with self.finalize_order_placement_lock:
+            if order_type == OrderType.BUY:
+                grid_level.place_buy_order(order)
+                await self.balance_tracker.update_after_buy(order.quantity, order.price)
+            else:
+                grid_level.place_sell_order(order)
+                await self.balance_tracker.update_after_sell(order.quantity, order.price)
+            
+            self.order_book.add_order(order, grid_level)
+            self.logger.debug(f"{order_type} order placed at {order.price} for grid level {grid_level.price}.")

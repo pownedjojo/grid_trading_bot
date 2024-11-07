@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import Mock
 from core.order_handling.balance_tracker import BalanceTracker
-from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
 
 @pytest.mark.asyncio
 class TestBalanceTracker:
@@ -18,20 +17,12 @@ class TestBalanceTracker:
         assert self.balance_tracker.crypto_balance == 10 + 2
         assert self.balance_tracker.total_fees == 2 * 50 * 0.01
 
-    async def test_update_after_buy_insufficient_balance(self):
-        with pytest.raises(InsufficientBalanceError):
-            await self.balance_tracker.update_after_buy(quantity=1000, price=100)  # Too expensive
-
     async def test_update_after_sell_success(self):
         await self.balance_tracker.update_after_sell(quantity=5, price=200)
         
         assert self.balance_tracker.crypto_balance == 10 - 5
         assert self.balance_tracker.balance == 1000 + (5 * 200 - (5 * 200 * 0.01))  # 1000 + revenue - fee
         assert self.balance_tracker.total_fees == 5 * 200 * 0.01
-
-    async def test_update_after_sell_insufficient_crypto_balance(self):
-        with pytest.raises(InsufficientCryptoBalanceError):
-            await self.balance_tracker.update_after_sell(quantity=20, price=200)  # More crypto than available
 
     async def test_sell_all(self):
         await self.balance_tracker.sell_all(price=100)

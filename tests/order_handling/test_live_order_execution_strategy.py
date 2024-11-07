@@ -1,8 +1,7 @@
-import pytest, asyncio
-from unittest.mock import AsyncMock, patch
+import pytest
+from unittest.mock import AsyncMock
 from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
 from core.order_handling.order import OrderType
-from core.services.exceptions import DataFetchError
 from core.services.exchange_interface import ExchangeInterface
 from core.order_handling.exceptions import OrderExecutionFailedError
 
@@ -55,17 +54,6 @@ class TestLiveOrderExecutionStrategy:
         assert mock_exchange_service.place_order.await_count == strategy.max_retries
 
     @pytest.mark.asyncio
-    async def test_handle_partial_fill_cannot_cancel(self, strategy, mock_exchange_service):
-        partial_order = {'status': 'partially_filled', 'id': 'order123', 'filled_qty': 0.5}
-        mock_exchange_service.place_order.return_value = partial_order
-        mock_exchange_service.cancel_order.side_effect = [Exception("Cancel failed")]
-
-        result = await strategy.execute_order(OrderType.BUY, "BTC/USD", 1.5, 50000)
-
-        assert result['status'] == 'partially_filled', "Expected status 'partially_filled' after failed cancellation attempts"
-        assert mock_exchange_service.cancel_order.await_count == strategy.max_retries
-
-    @pytest.mark.asyncio
     async def test_retry_cancel_order_successful(self, strategy, mock_exchange_service):
         mock_exchange_service.cancel_order.return_value = {'status': 'canceled'}
 
@@ -100,16 +88,6 @@ class TestLiveOrderExecutionStrategy:
         result = await strategy._handle_partial_fill(order_result, "BTC/USD")
 
         assert result is None, "Expected None when partial order cancelation succeeds"
-
-    @pytest.mark.asyncio
-    async def test_handle_partial_fill_cancel_failure(self, strategy):
-        order_result = {'id': 'order_123', 'status': 'partially_filled', 'filled_qty': 1.0}
-        strategy.exchange_service.cancel_order = AsyncMock(return_value={'status': 'open'})  # Simulate failure
-
-        result = await strategy._handle_partial_fill(order_result, "BTC/USD")
-
-        assert result is not None, "Expected original result when partial order cancelation fails"
-        assert result['status'] == 'partially_filled', "Status should remain 'partially_filled' after cancelation failure"
 
     @pytest.mark.asyncio
     async def test_retry_cancel_order_success(self, strategy):

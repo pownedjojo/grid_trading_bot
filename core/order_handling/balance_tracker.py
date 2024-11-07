@@ -1,4 +1,3 @@
-from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
 from .fee_calculator import FeeCalculator
 
 class BalanceTracker:
@@ -20,9 +19,6 @@ class BalanceTracker:
     ) -> None:
         fee = self.fee_calculator.calculate_fee(quantity * price)
         total_cost = quantity * price + fee
-        if self.balance < total_cost:
-            raise InsufficientBalanceError("Insufficient balance to complete the transaction")
-        
         self.balance -= total_cost
         self.crypto_balance += quantity
         self.total_fees += fee
@@ -33,9 +29,6 @@ class BalanceTracker:
         price: float
     ) -> None:
         fee = self.fee_calculator.calculate_fee(quantity * price)
-        if self.crypto_balance < quantity:
-            raise InsufficientCryptoBalanceError("Insufficient crypto balance to complete the transaction")
-        
         self.crypto_balance -= quantity
         self.balance += quantity * price - fee
         self.total_fees += fee

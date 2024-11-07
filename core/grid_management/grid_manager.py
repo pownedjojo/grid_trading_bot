@@ -66,15 +66,15 @@ class GridManager:
         bottom_range = self.config_manager.get_bottom_range()
         top_range = self.config_manager.get_top_range()
         num_grids = self.config_manager.get_num_grids()
-        spacing_type = self.config_manager.get_spacing_type()
-        return bottom_range, top_range, num_grids, spacing_type
+        grid_type = self.config_manager.get_grid_type()
+        return bottom_range, top_range, num_grids, grid_type
 
     def _calculate_price_grids_and_central_price(self) -> Tuple[List[float], float]:
-        bottom_range, top_range, num_grids, spacing_type = self._extract_grid_config()
-        if spacing_type == 'arithmetic':
+        bottom_range, top_range, num_grids, grid_type = self._extract_grid_config()
+        if grid_type == 'arithmetic':
             grids = np.linspace(bottom_range, top_range, num_grids)
             central_price = (top_range + bottom_range) / 2
-        elif spacing_type == 'geometric':
+        elif grid_type == 'geometric':
             grids = []
             ratio = (top_range / bottom_range) ** (1 / (num_grids - 1))
             current_price = bottom_range

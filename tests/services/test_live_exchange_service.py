@@ -45,7 +45,7 @@ class TestLiveExchangeService:
         assert service.exchange.enableRateLimit, "Expected rate limiting to be enabled for live mode"
 
     @patch("core.services.live_exchange_service.getattr")
-    def test_missing_secret_key_raises_error(self, mock_getattr, config_manager, monkeypatch):
+    def test_missing_secret_key_raises_error(self, config_manager, monkeypatch):
         monkeypatch.delenv("EXCHANGE_SECRET_KEY", raising=False)
         monkeypatch.setenv("EXCHANGE_API_KEY", "test_api_key")
 
@@ -53,7 +53,7 @@ class TestLiveExchangeService:
             LiveExchangeService(config_manager, is_paper_trading_activated=False)
 
     @patch("core.services.live_exchange_service.getattr")
-    def test_missing_api_key_raises_error(self, mock_getattr, config_manager, monkeypatch):
+    def test_missing_api_key_raises_error(self, config_manager, monkeypatch):
         monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
         monkeypatch.setenv("EXCHANGE_SECRET_KEY", "test_secret_key")
 
@@ -62,7 +62,7 @@ class TestLiveExchangeService:
 
     @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")
-    def test_sandbox_mode_initialization(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars):
+    def test_sandbox_mode_initialization(self, mock_getattr, mock_ccxt, config_manager):
         config_manager.get_trading_mode.return_value = TradingMode.PAPER_TRADING
 
         mock_exchange_instance = MagicMock()
@@ -77,7 +77,7 @@ class TestLiveExchangeService:
         assert mock_exchange_instance.urls['api'] == expected_sandbox_url, "Sandbox URL not correctly set for Binance."
 
     @patch("core.services.live_exchange_service.getattr")
-    def test_unsupported_exchange_raises_error(self, mock_getattr, config_manager, setup_env_vars):
+    def test_unsupported_exchange_raises_error(self, mock_getattr, config_manager):
         config_manager.get_exchange_name.return_value = "unsupported_exchange"
         mock_getattr.side_effect = AttributeError
 
@@ -87,7 +87,7 @@ class TestLiveExchangeService:
     @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
-    async def test_place_order_successful(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars, mock_exchange_instance):
+    async def test_place_order_successful(self, mock_getattr, mock_ccxt, config_manager, mock_exchange_instance):
         mock_getattr.return_value = mock_ccxt.binance
         mock_ccxt.binance.return_value = mock_exchange_instance
 
@@ -99,8 +99,9 @@ class TestLiveExchangeService:
 
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
-    async def test_place_order_invalid_type_raises_error(self, mock_getattr, config_manager, setup_env_vars):
+    async def test_place_order_invalid_type_raises_error(self, mock_getattr, config_manager):
         mock_exchange_instance = AsyncMock()
+
         mock_getattr.return_value = mock_exchange_instance
 
         service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
@@ -110,8 +111,9 @@ class TestLiveExchangeService:
 
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
-    async def test_place_order_unexpected_error(self, mock_getattr, config_manager, setup_env_vars):
+    async def test_place_order_unexpected_error(self, mock_getattr, config_manager):
         mock_exchange_instance = AsyncMock()
+
         mock_exchange_instance.create_limit_buy_order.side_effect = Exception("Unexpected error")
         mock_getattr.return_value = mock_exchange_instance
 
@@ -123,7 +125,7 @@ class TestLiveExchangeService:
     @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
-    async def test_get_current_price_successful(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars, mock_exchange_instance):
+    async def test_get_current_price_successful(self, mock_getattr, mock_ccxt, config_manager, mock_exchange_instance):
         mock_getattr.return_value = mock_ccxt.binance
         mock_ccxt.binance.return_value = mock_exchange_instance
 
@@ -136,7 +138,7 @@ class TestLiveExchangeService:
     @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
-    async def test_cancel_order_successful(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars, mock_exchange_instance):
+    async def test_cancel_order_successful(self, mock_getattr, mock_ccxt, config_manager, mock_exchange_instance):
         mock_getattr.return_value = mock_ccxt.binance
         mock_ccxt.binance.return_value = mock_exchange_instance
 
@@ -148,7 +150,7 @@ class TestLiveExchangeService:
     
     @patch("core.services.live_exchange_service.getattr")
     @patch("core.services.live_exchange_service.ccxt")
-    def test_fetch_ohlcv_not_implemented(self, mock_ccxt, mock_getattr, setup_env_vars, config_manager):
+    def test_fetch_ohlcv_not_implemented(self, mock_ccxt, mock_getattr, config_manager):
         mock_exchange_instance = Mock()
         mock_ccxt.binance.return_value = mock_exchange_instance
         mock_getattr.return_value = mock_ccxt.binance

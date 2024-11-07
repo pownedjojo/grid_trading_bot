@@ -11,7 +11,6 @@ from strategies.plotter import Plotter
 from strategies.grid_trading_strategy import GridTradingStrategy
 from config.trading_mode import TradingMode
 
-@pytest.mark.asyncio
 class TestGridTradingStrategy:
     @pytest.fixture
     def setup_strategy(self):
@@ -47,7 +46,8 @@ class TestGridTradingStrategy:
             )
 
         return create_strategy, config_manager, exchange_service, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter
-
+    
+    @pytest.mark.asyncio
     async def test_initialize_strategy(self, setup_strategy):
         create_strategy, _, _, grid_manager, *_ = setup_strategy
         strategy = create_strategy()
@@ -56,6 +56,7 @@ class TestGridTradingStrategy:
 
         grid_manager.initialize_grids_and_levels.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_stop_trading(self, setup_strategy):
         create_strategy, _, exchange_service, *_ = setup_strategy
         strategy = create_strategy()
@@ -66,6 +67,7 @@ class TestGridTradingStrategy:
         assert strategy._running is False
         exchange_service.close_connection.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_restart_trading(self, setup_strategy):
         create_strategy, _, _, _, _, _, *_ = setup_strategy
         strategy = create_strategy()

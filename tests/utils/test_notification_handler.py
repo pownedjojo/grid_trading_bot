@@ -5,7 +5,6 @@ from utils.notification.notification_handler import NotificationHandler
 from utils.notification.notification_content import NotificationType
 from config.trading_mode import TradingMode
 
-@pytest.mark.asyncio
 class TestNotificationHandler:
     @pytest.fixture
     def notification_handler_enabled(self):
@@ -32,6 +31,7 @@ class TestNotificationHandler:
         mock_apprise.assert_not_called()
 
     @patch("apprise.Apprise.notify")
+    @pytest.mark.asyncio
     async def test_send_notification_with_predefined_content(self, mock_notify, notification_handler_enabled):
         handler = notification_handler_enabled
         order_placed =  Order(price=1000, quantity=5, order_type=OrderType.BUY, timestamp="2024-01-01T00:00:00Z")
@@ -47,6 +47,7 @@ class TestNotificationHandler:
         )
 
     @patch("apprise.Apprise.notify")
+    @pytest.mark.asyncio
     async def test_send_notification_with_custom_message(self, mock_notify, notification_handler_enabled):
         handler = notification_handler_enabled
         
@@ -58,6 +59,7 @@ class TestNotificationHandler:
         )
 
     @patch("apprise.Apprise.notify")
+    @pytest.mark.asyncio
     async def test_send_notification_disabled(self, mock_notify, notification_handler_disabled):
         handler = notification_handler_disabled
         
@@ -67,6 +69,7 @@ class TestNotificationHandler:
 
     @patch("apprise.Apprise.notify")
     @patch("utils.notification.notification_handler.logging.Logger.warning")
+    @pytest.mark.asyncio
     async def test_send_notification_with_missing_placeholder(self, mock_log_warning, mock_notify, notification_handler_enabled):
         handler = notification_handler_enabled
 
@@ -76,6 +79,7 @@ class TestNotificationHandler:
         mock_notify.assert_called_once_with(title="Order Placed", body="New order placed successfully:\nN/A")
 
     @patch("apprise.Apprise.notify")
+    @pytest.mark.asyncio
     async def test_send_notification_with_order_failed(self, mock_notify, notification_handler_enabled):
         handler = notification_handler_enabled
 

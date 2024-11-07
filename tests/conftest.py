@@ -16,30 +16,27 @@ def valid_config():
         "trading_settings": {
             "timeframe": "1m",
             "period": {
-            "start_date": "2024-07-04T00:00:00Z",
-            "end_date": "2024-07-11T00:00:00Z"
+                "start_date": "2024-07-04T00:00:00Z",
+                "end_date": "2024-07-11T00:00:00Z"
             },
             "initial_balance": 10000
         },
         "grid_strategy": {
+            "type": "arithmetic",
             "num_grids": 20,
             "range": {
-            "top": 3100,
-            "bottom": 2850
-            },
-            "spacing": {
-            "type": "arithmetic",
-            "percentage_spacing": 0.05
+                "top": 3100,
+                "bottom": 2850
             }
         },
         "risk_management": {
             "take_profit": {
-            "enabled": False,
-            "threshold": 3700
+                "enabled": False,
+                "threshold": 3700
             },
             "stop_loss": {
-            "enabled": False,
-            "threshold": 2830
+                "enabled": False,
+                "threshold": 2830
             }
         },
         "logging": {

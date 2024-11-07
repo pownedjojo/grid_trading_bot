@@ -88,6 +88,10 @@ class ConfigManager:
     # --- Grid Accessor Methods ---
     def get_grid_settings(self):
         return self.config.get('grid_strategy', {})
+    
+    def get_grid_type(self):
+        grid_settings = self.get_grid_settings()
+        return grid_settings.get('type', None)
 
     def get_num_grids(self):
         grid_settings = self.get_grid_settings()
@@ -104,18 +108,6 @@ class ConfigManager:
     def get_bottom_range(self):
         grid_range = self.get_grid_range()
         return grid_range.get('bottom', None)
-    
-    def get_grid_spacing(self):
-        grid_settings = self.get_grid_settings()
-        return grid_settings.get('spacing', {})
-
-    def get_spacing_type(self):
-        grid_spacing = self.get_grid_spacing()
-        return grid_spacing.get('type', None)
-
-    def get_percentage_spacing(self):
-        grid_spacing = self.get_grid_spacing()
-        return grid_spacing.get('percentage_spacing', None)
 
     # --- Risk management (Take Profit / Stop Loss) Accessor Methods ---
     def get_risk_management(self):

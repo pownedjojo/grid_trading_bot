@@ -35,7 +35,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
                     return order_result  # Order fully filled
 
                 elif order_result['status'] == 'partially_filled':
-                    order_result = await self._handle_partial_fill(order_result, pair, order_type)
+                    order_result = await self._handle_partial_fill(order_result, pair)
                     if order_result:
                         return order_result
 
@@ -79,8 +79,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     async def _handle_partial_fill(
         self, 
         order_result: dict, 
-        pair: str, 
-        order_type: OrderType
+        pair: str,
     ) -> Optional[dict]:
         filled_qty = order_result.get('filled_qty', 0)
         self.logger.info(f"Order partially filled with {filled_qty}. Attempting to cancel and retry full quantity.")

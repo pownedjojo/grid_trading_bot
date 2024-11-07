@@ -1,5 +1,4 @@
 import pytest
-from unittest.mock import Mock
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigValidationError
 
@@ -77,6 +76,12 @@ class TestConfigValidator:
         assert 'trading_settings.period.end_date' in excinfo.value.missing_fields
 
     def test_validate_invalid_grid_settings(self, config_validator, valid_config):
+        # Test invalid grid type
+        valid_config['grid_strategy']['type'] = 'invalid_type'  # Invalid grid type
+        with pytest.raises(ConfigValidationError) as excinfo:
+            config_validator.validate(valid_config)
+        assert 'grid_strategy.type' in excinfo.value.invalid_fields
+        
         # Test missing num_grids
         valid_config['grid_strategy']['num_grids'] = None
         with pytest.raises(ConfigValidationError) as excinfo:
@@ -89,18 +94,6 @@ class TestConfigValidator:
             config_validator.validate(valid_config)
         assert 'grid_strategy.range.top' in excinfo.value.invalid_fields
         assert 'grid_strategy.range.bottom' in excinfo.value.invalid_fields
-
-        # Test invalid spacing type
-        valid_config['grid_strategy']['spacing']['type'] = 'invalid_type'  # Invalid spacing type
-        with pytest.raises(ConfigValidationError) as excinfo:
-            config_validator.validate(valid_config)
-        assert 'grid_strategy.spacing.type' in excinfo.value.invalid_fields
-
-        # Test missing percentage_spacing when spacing type is 'geometric'
-        valid_config['grid_strategy']['spacing'] = {'type': 'geometric', 'percentage_spacing': None}
-        with pytest.raises(ConfigValidationError) as excinfo:
-            config_validator.validate(valid_config)
-        assert 'grid_strategy.spacing.percentage_spacing' in excinfo.value.missing_fields
 
     def test_validate_limits_invalid_type(self, config_validator, valid_config):
         valid_config['risk_management'] = {

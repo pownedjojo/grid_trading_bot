@@ -102,6 +102,13 @@ class ConfigValidator:
         missing_fields = []
         invalid_fields = []
         grid = config.get('grid_strategy', {})
+        
+        if grid.get('type') is None:
+            missing_fields.append('grid_strategy.type')
+
+        if grid.get('type') not in ['arithmetic', 'geometric']:
+            self.logger.error("Grid type must be either 'arithmetic' or 'geometric'.")
+            invalid_fields.append('grid_strategy.type')
 
         if grid.get('num_grids') is None:
             missing_fields.append('grid_strategy.num_grids')
@@ -118,14 +125,6 @@ class ConfigValidator:
             self.logger.error("Bottom range must be less than top range.")
             invalid_fields.append('grid_strategy.range.top')
             invalid_fields.append('grid_strategy.range.bottom')
-
-        spacing = grid.get('spacing', {})
-        if spacing.get('type') not in ['arithmetic', 'geometric']:
-            self.logger.error("Grid spacing_type must be either 'arithmetic' or 'geometric'.")
-            invalid_fields.append('grid_strategy.spacing.type')
-
-        if spacing.get('type') == 'geometric' and spacing.get('percentage_spacing') is None:
-            missing_fields.append('grid_strategy.spacing.percentage_spacing')
 
         return missing_fields, invalid_fields
 

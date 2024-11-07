@@ -97,7 +97,7 @@ class TestLiveOrderExecutionStrategy:
         order_result = {'id': 'order_123', 'status': 'partially_filled', 'filled_qty': 1.0}
         strategy.exchange_service.cancel_order = AsyncMock(return_value={'status': 'canceled'})
 
-        result = await strategy._handle_partial_fill(order_result, "BTC/USD", OrderType.SELL)
+        result = await strategy._handle_partial_fill(order_result, "BTC/USD")
 
         assert result is None, "Expected None when partial order cancelation succeeds"
 
@@ -106,7 +106,7 @@ class TestLiveOrderExecutionStrategy:
         order_result = {'id': 'order_123', 'status': 'partially_filled', 'filled_qty': 1.0}
         strategy.exchange_service.cancel_order = AsyncMock(return_value={'status': 'open'})  # Simulate failure
 
-        result = await strategy._handle_partial_fill(order_result, "BTC/USD", OrderType.SELL)
+        result = await strategy._handle_partial_fill(order_result, "BTC/USD")
 
         assert result is not None, "Expected original result when partial order cancelation fails"
         assert result['status'] == 'partially_filled', "Status should remain 'partially_filled' after cancelation failure"

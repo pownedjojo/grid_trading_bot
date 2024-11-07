@@ -75,7 +75,7 @@ class GridTradingStrategy(TradingStrategy):
     
     async def _run_live_or_paper_trading(self):
         self.logger.info(f"Starting {'live' if self.trading_mode == TradingMode.LIVE else 'paper'} trading")
-        pair = self.config_manager.get_pair()
+        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
         last_price: Optional[float] = None
 
         async def on_ticker_update(current_price, timestamp):

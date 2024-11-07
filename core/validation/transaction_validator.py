@@ -1,3 +1,5 @@
+from ccxt.okx import Order
+from ..order_handling.order import OrderType
 from ..grid_management.grid_level import GridLevel
 from .exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 
@@ -16,7 +18,7 @@ class TransactionValidator:
         grid_level: GridLevel
     ) -> None:
         self._check_balance(balance, quantity, price, grid_level)
-        self._check_grid_level(grid_level, is_buy=True)
+        self._check_grid_level(grid_level, OrderType.BUY)
 
     def validate_sell_order(
         self, 
@@ -25,7 +27,7 @@ class TransactionValidator:
         grid_level: GridLevel
     ) -> None:
         self._check_crypto_balance(crypto_balance, quantity, grid_level)
-        self._check_grid_level(grid_level, is_buy=False)
+        self._check_grid_level(grid_level, OrderType.SELL)
 
     def _check_balance(
         self, 
@@ -50,9 +52,11 @@ class TransactionValidator:
     def _check_grid_level(
         self, 
         grid_level: GridLevel, 
-        is_buy: bool = True
+        order_type: OrderType
     ) -> None:
-        if is_buy and not grid_level.can_place_buy_order():
-            raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order.")
-        if not is_buy and not grid_level.can_place_sell_order():
-            raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a sell order.")
+        if order_type == OrderType.BUY:
+            if not grid_level.can_place_buy_order():
+                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.cycle_state}")
+        else:  # SELL
+            if not grid_level.can_place_sell_order():
+                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a sell order, current state: {grid_level.cycle_state}")

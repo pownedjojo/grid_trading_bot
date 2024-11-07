@@ -11,6 +11,7 @@ from ..validation.exceptions import InsufficientBalanceError, InsufficientCrypto
 from .execution_strategy.order_execution_strategy import OrderExecutionStrategy
 from utils.notification.notification_handler import NotificationHandler
 from utils.notification.notification_content import NotificationType
+from .exceptions import OrderExecutionFailedError
 
 class OrderManager:
     def __init__(
@@ -62,11 +63,12 @@ class OrderManager:
             return
 
         event = "Take profit" if take_profit_order else "Stop loss"
+        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
 
         try:
             order_result = await self.order_execution_strategy.execute_order(
                 OrderType.SELL, 
-                self.config_manager.get_pair(), 
+                pair, 
                 self.balance_tracker.crypto_balance, 
                 current_price
             )
@@ -100,7 +102,6 @@ class OrderManager:
 
             if quantity > 0:
                 self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
-                await self._verify_order_conditions(grid_level, OrderType.BUY)
                 await self._place_order(grid_level, OrderType.BUY, current_price, quantity, timestamp)
             
         except GridLevelNotReadyError as e:
@@ -108,6 +109,10 @@ class OrderManager:
 
         except InsufficientBalanceError as e:
             self.logger.warning(f"Cannot process buy order: {e}")
+        
+        except OrderExecutionFailedError as e:
+            self.logger.error(f"Order execution failed: {str(e)}")
+            await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place order: {e}")
 
         except Exception as e:
             self.logger.error(f"Unexpected error while processing buy order: {e}")
@@ -130,7 +135,6 @@ class OrderManager:
 
             if quantity > 0:
                 self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, buy_order.quantity, grid_level)
-                await self._verify_order_conditions(grid_level, OrderType.SELL)
                 await self._place_order(grid_level, OrderType.SELL, current_price, quantity, timestamp)
                 self.grid_manager.reset_grid_cycle(buy_grid_level)
         
@@ -139,21 +143,13 @@ class OrderManager:
 
         except InsufficientCryptoBalanceError as e:
             self.logger.warning(f"Cannot process sell order: {e}")
+        
+        except OrderExecutionFailedError as e:
+            self.logger.error(f"Order execution failed: {str(e)}")
+            await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place order: {e}")
 
         except Exception as e:
             self.logger.error(f"Unexpected error while processing sell order: {e}")
-
-    async def _verify_order_conditions(
-        self, 
-        grid_level: GridLevel, 
-        order_type: OrderType
-    ) -> None:
-        if order_type == OrderType.BUY:
-            if not grid_level.can_place_buy_order():
-                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.cycle_state}")
-        else:  # SELL
-            if not grid_level.can_place_sell_order():
-                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a sell order, current state: {grid_level.cycle_state}")
     
     async def _place_order(
         self, 
@@ -163,27 +159,23 @@ class OrderManager:
         quantity: float,
         timestamp: Union[int, str]
     ) -> None:
-        try:
-            order_result = await self.order_execution_strategy.execute_order(order_type, self.config_manager.get_pair(), quantity, current_price)
+        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
+        order_result = await self.order_execution_strategy.execute_order(order_type, pair, quantity, current_price)
 
-            order = Order(
-                price=order_result.get('price', "N/A"),
-                quantity=order_result.get('filled_qty', "N/A"),
-                order_type=order_type,
-                timestamp=order_result.get('timestamp', timestamp)
-            )
+        order = Order(
+            price=order_result.get('price', "N/A"),
+            quantity=order_result.get('filled_qty', "N/A"),
+            order_type=order_type,
+            timestamp=order_result.get('timestamp', timestamp)
+        )
 
-            if order_result.get('status') == 'filled':
-                await self._handle_order_placement(order, grid_level, order_type)              
-                await self.notification_handler.async_send_notification(NotificationType.ORDER_PLACED, order_details=str(order))
-            else:
-                await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details="Order could not be fully filled")
-                self.logger.warning(f"Order could not be fully filled. Status: {order_result.get('status')}")
+        if order_result.get('status') == 'filled':
+            await self._finalize_order_placement(order, grid_level, order_type)              
+            await self.notification_handler.async_send_notification(NotificationType.ORDER_PLACED, order_details=str(order))
+        else:
+            raise OrderExecutionFailedError("Order could not be fully filled", order_type, pair, quantity, current_price)
 
-        except Exception as e:
-            self.logger.error(f"Failed to place {order_type} order at {current_price}: {e}")
-
-    async def _handle_order_placement(
+    async def _finalize_order_placement(
         self, 
         order: Order, 
         grid_level: GridLevel, 

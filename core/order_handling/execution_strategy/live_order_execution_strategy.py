@@ -33,11 +33,8 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
                 
                 if order_result['status'] == 'filled':
                     return order_result  # Order fully filled
-
                 elif order_result['status'] == 'partially_filled':
-                    order_result = await self._handle_partial_fill(order_result, pair)
-                    if order_result:
-                        return order_result
+                    await self._handle_partial_fill(order_result, pair)
 
                 await asyncio.sleep(self.retry_delay)
                 self.logger.info(f"Retrying order. Attempt {attempt + 1}/{self.max_retries}.")
@@ -47,7 +44,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
                 self.logger.error(f"Attempt {attempt + 1} failed with error: {str(e)}")
                 await asyncio.sleep(self.retry_delay)
 
-        raise OrderExecutionFailedError("Failed to execute limit order after maximum retries.",order_type, pair, quantity, price)
+        raise OrderExecutionFailedError("Failed to execute limit order after maximum retries.", order_type, pair, quantity, price)
 
     async def _normalize_order_result(
         self, 
@@ -86,10 +83,6 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
 
         if not await self._retry_cancel_order(order_result['id'], pair):
             self.logger.error(f"Unable to cancel partially filled order {order_result['id']} after retries.")
-            order_result['status'] = 'partially_filled'
-            return order_result
-
-        return None
 
     async def _retry_cancel_order(
         self, 

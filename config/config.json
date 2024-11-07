@@ -5,26 +5,23 @@
     "trading_mode": "backtest"
   },
   "pair": {
-    "base_currency": "ETH",
+    "base_currency": "SOL",
     "quote_currency": "USDT"
   },
   "trading_settings": {
-    "timeframe": "1h",
+    "timeframe": "1m",
     "period": {
-      "start_date": "2024-07-24T00:00:00Z",
-      "end_date": "2024-10-01T00:00:00Z"
+      "start_date": "2024-10-25T17:11:00Z",
+      "end_date": "2024-11-07T13:00:00Z"
     },
-    "initial_balance": 10000
+    "initial_balance": 120
   },
   "grid_strategy": {
-    "num_grids": 10,
+    "type": "geometric",
+    "num_grids": 8,
     "range": {
-      "top": 3600,
-      "bottom": 3300
-    },
-    "spacing": {
-      "type": "arithmetic",
-      "percentage_spacing": 0.05
+      "top": 182,
+      "bottom": 162
     }
   },
   "risk_management": {

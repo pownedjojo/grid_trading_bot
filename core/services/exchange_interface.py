@@ -33,16 +33,26 @@ class ExchangeInterface(ABC):
         pass
     
     @abstractmethod
-    async def get_current_price(self, pair: str) -> float:
+    async def get_current_price(
+        self, 
+        pair: str
+    ) -> float:
         """Fetches the current market price for the specified trading pair."""
         pass
 
     @abstractmethod
-    async def get_order_status(self, order_id: str) -> Dict[str, Union[str, float]]:
+    async def get_order_status(
+        self, 
+        order_id: str
+    ) -> Dict[str, Union[str, float]]:
         """Fetches the status of an order by its ID, returning details such as status and filled quantity."""
         pass
 
     @abstractmethod
-    async def cancel_order(self, order_id: str, pair: str) -> Dict[str, Union[str, float]]:
+    async def cancel_order(
+        self, 
+        order_id: str, 
+        pair: str
+    ) -> Dict[str, Union[str, float]]:
         """Attempts to cancel an order by ID, returning the result of the cancellation."""
         pass

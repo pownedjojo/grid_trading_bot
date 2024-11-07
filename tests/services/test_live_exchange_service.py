@@ -1,7 +1,7 @@
-import pytest, ccxt
+import pytest
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from core.services.live_exchange_service import LiveExchangeService
-from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError, OrderCancellationError, InvalidOrderTypeError
+from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError, InvalidOrderTypeError
 from config.config_manager import ConfigManager
 from config.trading_mode import TradingMode
 

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch, Mock, AsyncMock
+from unittest.mock import patch
 from core.order_handling.order import Order, OrderType
 from utils.notification.notification_handler import NotificationHandler
 from utils.notification.notification_content import NotificationType

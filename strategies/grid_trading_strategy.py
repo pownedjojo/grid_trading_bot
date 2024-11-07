@@ -53,7 +53,7 @@ class GridTradingStrategy(TradingStrategy):
         return pair, timeframe, start_date, end_date
 
     def initialize_strategy(self):
-        self.grid_manager.initialize_grid_levels()
+        self.grid_manager.initialize_grids_and_levels()
     
     async def stop(self):
         self._running = False
@@ -130,11 +130,20 @@ class GridTradingStrategy(TradingStrategy):
         else:
             self.logger.info("Plotting is not available for live/paper trading mode.")
     
-    async def _execute_orders(self, current_price: float, previous_price: float, current_timestamp: Union[int, str]) -> None:
+    async def _execute_orders(
+        self, 
+        current_price: float, 
+        previous_price: float, 
+        current_timestamp: Union[int, str]
+    ) -> None:
         await self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)
         await self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, current_timestamp)
 
-    async def _check_take_profit_stop_loss(self, current_price: float, current_timestamp: Union[int, str]) -> bool:
+    async def _check_take_profit_stop_loss(
+        self, 
+        current_price: float, 
+        current_timestamp: Union[int, str]
+    ) -> bool:
         if self.balance_tracker.crypto_balance == 0:
             return False
 

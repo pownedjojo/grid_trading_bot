@@ -1,10 +1,8 @@
-import pytest
 from unittest.mock import Mock
 from core.order_handling.order_book import OrderBook
 from core.order_handling.order import OrderType
 
 class TestOrderBook:
-
     def test_add_buy_order_with_grid(self):
         order_book = OrderBook()
         buy_order = Mock(order_type=OrderType.BUY)

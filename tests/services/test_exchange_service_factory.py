@@ -1,11 +1,10 @@
-import pytest, ccxt
+import pytest
 from unittest.mock import Mock, patch
 from core.services.exchange_service_factory import ExchangeServiceFactory
 from core.services.live_exchange_service import LiveExchangeService
 from core.services.backtest_exchange_service import BacktestExchangeService
 from config.config_manager import ConfigManager
 from config.trading_mode import TradingMode
-from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError
 
 class TestExchangeServiceFactory:
     @pytest.fixture

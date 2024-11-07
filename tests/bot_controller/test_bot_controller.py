@@ -1,4 +1,4 @@
-import pytest, asyncio
+import pytest
 from unittest.mock import Mock, patch, AsyncMock
 from core.bot_controller.bot_controller import BotController
 from strategies.grid_trading_strategy import GridTradingStrategy

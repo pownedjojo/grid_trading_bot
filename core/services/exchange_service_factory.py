@@ -5,7 +5,10 @@ from config.trading_mode import TradingMode
 
 class ExchangeServiceFactory:
     @staticmethod
-    def create_exchange_service(config_manager: ConfigManager, trading_mode: TradingMode):
+    def create_exchange_service(
+        config_manager: ConfigManager,
+        trading_mode: TradingMode
+    ):
         if trading_mode == TradingMode.BACKTEST:
             return BacktestExchangeService(config_manager)
         elif trading_mode == TradingMode.PAPER_TRADING:

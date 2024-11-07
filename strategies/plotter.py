@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import List
 import plotly.graph_objects as go
 import pandas as pd
 from core.grid_management.grid_manager import GridManager
@@ -12,7 +12,7 @@ class Plotter:
 
     def plot_results(self, data: pd.DataFrame) -> None:
         fig = self.create_base_figure(data)
-        grids, central_price = self.grid_manager.grids, self.grid_manager.central_price
+        grids, central_price = self.grid_manager.price_grids, self.grid_manager.central_price
         self.add_grid_lines(fig, grids, central_price)
         buy_orders = self.order_book.get_all_buy_orders()
         sell_orders = self.order_book.get_all_sell_orders()

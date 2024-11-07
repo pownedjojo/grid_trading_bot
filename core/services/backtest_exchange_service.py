@@ -30,7 +30,13 @@ class BacktestExchangeService(ExchangeInterface):
         markets = self.exchange.load_markets()
         return pair in markets
 
-    def fetch_ohlcv(self, pair: str, timeframe: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def fetch_ohlcv(
+        self, 
+        pair: str, 
+        timeframe: str, 
+        start_date: str, 
+        end_date: str
+    ) -> pd.DataFrame:
         if self.historical_data_file:
             if not os.path.exists(self.historical_data_file):
                 raise HistoricalMarketDataFileNotFoundError(f"Failed to load OHLCV data from file: {self.historical_data_file}")
@@ -62,7 +68,12 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to fetch OHLCV data {str(e)}.")
     
-    def _load_ohlcv_from_file(self, file_path: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def _load_ohlcv_from_file(
+        self, 
+        file_path: str, 
+        start_date: str, 
+        end_date: str
+    ) -> pd.DataFrame:
         try:
             df = pd.read_csv(file_path, parse_dates=['timestamp'])
             df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -76,11 +87,24 @@ class BacktestExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Failed to load OHLCV data from file: {str(e)}")
 
-    def _fetch_ohlcv_single_batch(self, pair: str, timeframe: str, since: int, until: int) -> pd.DataFrame:
+    def _fetch_ohlcv_single_batch(
+        self, 
+        pair: str, 
+        timeframe: str, 
+        since: int, 
+        until: int
+    ) -> pd.DataFrame:
         ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since)
         return self._format_ohlcv(ohlcv, until)
 
-    def _fetch_ohlcv_in_chunks(self, pair: str, timeframe: str, since: int, until: int, candles_per_request: int) -> pd.DataFrame:
+    def _fetch_ohlcv_in_chunks(
+        self, 
+        pair: str, 
+        timeframe: str, 
+        since: int,
+        until: int,
+        candles_per_request: int
+    ) -> pd.DataFrame:
         all_ohlcv = []
         while since < until:
             ohlcv = self._fetch_with_retry(self.exchange.fetch_ohlcv, pair, timeframe, since, limit=candles_per_request)
@@ -91,7 +115,11 @@ class BacktestExchangeService(ExchangeInterface):
             self.logger.info(f"Fetched up to {pd.to_datetime(since, unit='ms')}")
         return self._format_ohlcv(all_ohlcv, until)
 
-    def _format_ohlcv(self, ohlcv, until: int) -> pd.DataFrame:
+    def _format_ohlcv(
+        self, 
+        ohlcv, 
+        until: int
+    ) -> pd.DataFrame:
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
@@ -104,7 +132,14 @@ class BacktestExchangeService(ExchangeInterface):
     def _get_timeframe_in_ms(self, timeframe: str) -> int:
         return TIMEFRAME_MAPPINGS.get(timeframe, 60 * 1000)  # Default to 1m if not found
 
-    def _fetch_with_retry(self, method, *args, retries=3, delay=5, **kwargs):
+    def _fetch_with_retry(
+        self,
+        method, 
+        *args, 
+        retries=3, 
+        delay=5, 
+        **kwargs
+    ):
         for attempt in range(retries):
             try:
                 return method(*args, **kwargs)
@@ -116,7 +151,13 @@ class BacktestExchangeService(ExchangeInterface):
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
 
-    def place_order(self, pair: str, order_type: str, amount: float, price: Optional[float] = None) -> dict:
+    def place_order(
+        self, 
+        pair: str, 
+        order_type: str, 
+        amount: float, 
+        price: Optional[float] = None
+    ) -> dict:
         raise NotImplementedError("place_order is not used in backtesting.")
 
     def get_balance(self) -> Dict[str, Any]:

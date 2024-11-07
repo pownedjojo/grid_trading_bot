@@ -1,14 +1,12 @@
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import Mock, AsyncMock
 import pytest
 from core.order_handling.order_manager import OrderManager
 from core.order_handling.order import Order, OrderType
 from core.grid_management.grid_level import GridLevel
 from core.services.exchange_interface import ExchangeInterface
-from config.trading_mode import TradingMode
 from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
 from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
 from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
-from utils.notification.notification_handler import NotificationHandler
 from utils.notification.notification_content import NotificationType
 
 class TestOrderManager:
@@ -46,19 +44,18 @@ class TestOrderManager:
 
     @pytest.mark.asyncio
     async def test_execute_order_no_grid_cross(self, order_manager, mock_dependencies):
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = None
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = None
         
         await order_manager.execute_order(OrderType.BUY, 1000, 900, "2024-01-01T00:00:00Z")
         
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.assert_called_once()
+        mock_dependencies['grid_manager'].get_crossed_grid_level.assert_called_once()
         mock_dependencies['transaction_validator'].validate_buy_order.assert_not_called()
         mock_dependencies['balance_tracker'].update_after_buy.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_execute_buy_order_with_valid_grid_cross(self, order_manager, mock_dependencies):
-        grid_level = Mock()
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        crossed_grid_level = Mock(spec=GridLevel, price=1000)
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
         mock_dependencies['grid_manager'].get_order_size_per_grid.return_value = 1000
         mock_dependencies['balance_tracker'].balance = 10000
 
@@ -73,21 +70,17 @@ class TestOrderManager:
 
         await order_manager.execute_order(OrderType.BUY, 1000, 900, "2024-01-01T00:00:00Z")
 
-        mock_dependencies['grid_manager'].get_grid_level.assert_called_once_with(1000)
         mock_dependencies['transaction_validator'].validate_buy_order.assert_called_once_with(
-            mock_dependencies['balance_tracker'].balance, 1000, 1000, grid_level
+            mock_dependencies['balance_tracker'].balance, 1000, 1000, crossed_grid_level
         )
         mock_dependencies['balance_tracker'].update_after_buy.assert_called_once_with(1000, 1000)
 
     @pytest.mark.asyncio
     async def test_execute_sell_order_with_valid_grid_cross(self, order_manager, mock_dependencies):
-        # Set up mocks
-        grid_level = Mock()
+        crossed_grid_level = Mock(spec=GridLevel, price=1000)
         buy_order = Mock(quantity=5)
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
         mock_dependencies['balance_tracker'].crypto_balance = 5
-
         buy_grid_level = Mock()
         buy_grid_level.buy_orders = [buy_order]
         mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = buy_grid_level
@@ -101,14 +94,12 @@ class TestOrderManager:
             }
             order_manager.order_execution_strategy.execute_order = AsyncMock(return_value=mock_order_result)
 
-        order_placed = Order(1000, 5, OrderType.SELL, "2024-01-01T00:00:00Z")
         await order_manager.execute_order(OrderType.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
 
-        mock_dependencies['grid_manager'].get_grid_level.assert_called_once_with(1000)
         mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(
             mock_dependencies['balance_tracker'].crypto_balance, 
             buy_order.quantity, 
-            grid_level
+            crossed_grid_level
         )
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(buy_order.quantity, 1000)
 
@@ -213,19 +204,19 @@ class TestOrderManager:
 
     @pytest.mark.asyncio
     async def test_multiple_buy_orders_for_sell(self, order_manager, mock_dependencies):
-        grid_level = Mock()
+        crossed_grid_level = Mock(spec=GridLevel, price=1000)
         buy_order_1 = Mock(quantity=2)
         buy_order_2 = Mock(quantity=3)
         mock_dependencies['balance_tracker'].crypto_balance = 5
 
         
         mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = Mock(buy_orders=[buy_order_1, buy_order_2])
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
         
         await order_manager.execute_order(OrderType.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
         
         mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(
-            mock_dependencies['balance_tracker'].crypto_balance, 3, grid_level
+            mock_dependencies['balance_tracker'].crypto_balance, 3, crossed_grid_level
         )
     
     @pytest.mark.asyncio
@@ -242,27 +233,22 @@ class TestOrderManager:
     
     @pytest.mark.asyncio
     async def test_extreme_price_fluctuation(self, order_manager, mock_dependencies):
-        grid_level = Mock()
-
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.side_effect = [None, 5000]
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        crossed_grid_level = Mock(spec=GridLevel, price=1000)
+        mock_dependencies['grid_manager'].get_crossed_grid_level.side_effect = [None, crossed_grid_level]
 
         await order_manager.execute_order(OrderType.BUY, 5000, 1000, "2024-01-01T00:00:00Z")
 
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.assert_called_once_with(5000, 1000, sell=False)
-        mock_dependencies['grid_manager'].get_grid_level.assert_not_called()  # No grid crossing, so no grid level
+        mock_dependencies['grid_manager'].get_crossed_grid_level.assert_called_once_with(5000, 1000, sell=False)
 
         # Reset mock call tracking for the second execution
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.reset_mock()
+        mock_dependencies['grid_manager'].get_crossed_grid_level.reset_mock()
 
         await order_manager.execute_order(OrderType.BUY, 5000, 4000, "2024-01-01T00:01:00Z")
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.assert_called_once_with(5000, 4000, sell=False)
-        mock_dependencies['grid_manager'].get_grid_level.assert_called_once_with(5000)
+        mock_dependencies['grid_manager'].get_crossed_grid_level.assert_called_once_with(5000, 4000, sell=False)
 
     @pytest.mark.asyncio
     async def test_negative_price_handling(self, order_manager, mock_dependencies):
-        grid_level = Mock()
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = None
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = None
 
         # Simulate a negative price scenario
         await order_manager.execute_order(OrderType.BUY, -1000, 1000, "2024-01-01T00:00:00Z")
@@ -272,10 +258,10 @@ class TestOrderManager:
 
     @pytest.mark.asyncio
     async def test_partial_crypto_balance_for_sell(self, order_manager, mock_dependencies):
-        grid_level = Mock()
+        crossed_grid_level = Mock(spec=GridLevel, price=1000)
         buy_order = Mock(quantity=5)
         mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = Mock(buy_orders=[buy_order])
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
         mock_dependencies['balance_tracker'].crypto_balance = 3  # Partial balance available
 
         if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
@@ -289,12 +275,11 @@ class TestOrderManager:
 
         await order_manager.execute_order(OrderType.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
         
-        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(3, buy_order.quantity, grid_level)
+        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(3, buy_order.quantity, crossed_grid_level)
         mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(3, 1000)
         
     @pytest.mark.asyncio
     async def test_minimal_price_difference(self, order_manager, mock_dependencies):
-        grid_level = Mock()
         mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = None
 
         # Test minimal price difference (e.g., only $1 difference)
@@ -305,9 +290,8 @@ class TestOrderManager:
     
     @pytest.mark.asyncio
     async def test_high_volume_trades(self, order_manager, mock_dependencies):
-        grid_level = Mock()
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
+        crossed_grid_level = Mock(spec=GridLevel, price=1000)
+        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
         mock_dependencies['grid_manager'].get_order_size_per_grid.return_value = 10000
         mock_dependencies['balance_tracker'].balance = 1000000  # Large balance for a large trade
 

@@ -2,7 +2,6 @@ import pytest, logging
 from pytest import approx
 from unittest.mock import Mock
 import pandas as pd
-import numpy as np
 from core.order_handling.order import Order, OrderType
 from core.grid_management.grid_level import GridLevel
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
@@ -146,7 +145,7 @@ class TestPerformanceAnalyzer:
         assert performance_summary["Grid Trading Gains"] == "197.80"
         assert performance_summary["Total Fees"] == f"{total_fees:.2f}"
         assert performance_summary["Final Balance (Fiat)"] == f"{balance + crypto_balance * final_crypto_price:.2f}"
-        assert performance_summary["Crypto Balance"] == f"{crypto_balance:.4f} {config_manager.get_base_currency()}"
+        assert performance_summary["Final Crypto Balance"] == f"{crypto_balance:.4f} {config_manager.get_base_currency()}"
         assert performance_summary["Remaining Fiat Balance"] == f"{balance:.2f} {config_manager.get_quote_currency()}"
         assert performance_summary["Number of Buy Trades"] == 1
         assert performance_summary["Number of Sell Trades"] == 1

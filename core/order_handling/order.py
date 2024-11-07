@@ -12,7 +12,13 @@ class OrderState(Enum):
     CANCELLED = 'cancelled'
 
 class Order:
-    def __init__(self, price: float, quantity: float, order_type: OrderType, timestamp: Union[int, str]):
+    def __init__(
+        self, 
+        price: float, 
+        quantity: float,
+        order_type: OrderType, 
+        timestamp: Union[int, str]
+    ):
         if not isinstance(order_type, OrderType):
             raise InvalidOrderTypeError("Invalid order type")
 

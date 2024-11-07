@@ -1,6 +1,5 @@
-import pytest, sys, os
+import pytest, sys
 from unittest.mock import patch
-from argparse import ArgumentError
 from utils.arg_parser import parse_and_validate_console_args
 
 @pytest.mark.parametrize("args, expected_config", [

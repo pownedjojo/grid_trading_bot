@@ -32,20 +32,31 @@ class OrderManager:
         self.order_execution_strategy = order_execution_strategy
         self.notification_handler = notification_handler
 
-    async def execute_order(self, order_type: OrderType, current_price: float, previous_price: float, timestamp: Union[int, str]) -> None:
-        grid_price = self.grid_manager.detect_grid_level_crossing(current_price, previous_price, sell=(order_type == OrderType.SELL))
+    async def execute_order(
+        self, 
+        order_type: OrderType, 
+        current_price: float, 
+        previous_price: float, 
+        timestamp: Union[int, str]
+    ) -> None:
+        crossed_grid_level = self.grid_manager.get_crossed_grid_level(current_price, previous_price, sell=(order_type == OrderType.SELL))
 
-        if grid_price is None:
+        if crossed_grid_level is None:
             self.logger.debug(f"No grid level crossed for {order_type}.")
             return
-        
-        grid_level_crossed = self.grid_manager.get_grid_level(grid_price)
+                
         if order_type == OrderType.BUY:
-            await self._process_buy_order(grid_level_crossed, current_price, timestamp)
+            await self._process_buy_order(crossed_grid_level, current_price, timestamp)
         elif order_type == OrderType.SELL:
-            await self._process_sell_order(grid_level_crossed, current_price, timestamp)
+            await self._process_sell_order(crossed_grid_level, current_price, timestamp)
     
-    async def execute_take_profit_or_stop_loss_order(self, current_price: float, timestamp: Union[int, str], take_profit_order: bool = False, stop_loss_order: bool = False) -> None:
+    async def execute_take_profit_or_stop_loss_order(
+        self, 
+        current_price: float, 
+        timestamp: Union[int, str], 
+        take_profit_order: bool = False, 
+        stop_loss_order: bool = False
+    ) -> None:
         if not (take_profit_order or stop_loss_order):
             self.logger.warning("No take profit or stop loss action specified.")
             return
@@ -78,7 +89,12 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
 
-    async def _process_buy_order(self, grid_level: GridLevel, current_price: float, timestamp: Union[int, str]) -> None:
+    async def _process_buy_order(
+        self, 
+        grid_level: GridLevel, 
+        current_price: float, 
+        timestamp: Union[int, str]
+    ) -> None:
         try:
             quantity = self.grid_manager.get_order_size_per_grid(current_price)
 
@@ -96,7 +112,12 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"Unexpected error while processing buy order: {e}")
     
-    async def _process_sell_order(self, grid_level: GridLevel, current_price: float, timestamp: Union[int, str]) -> None:
+    async def _process_sell_order(
+        self, 
+        grid_level: GridLevel, 
+        current_price: float, 
+        timestamp: Union[int, str]
+    ) -> None:
         buy_grid_level = self.grid_manager.find_lowest_completed_buy_grid()
 
         if buy_grid_level is None:
@@ -111,18 +132,22 @@ class OrderManager:
                 self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, buy_order.quantity, grid_level)
                 await self._verify_order_conditions(grid_level, OrderType.SELL)
                 await self._place_order(grid_level, OrderType.SELL, current_price, quantity, timestamp)
-                await self.grid_manager.reset_grid_cycle(buy_grid_level)
+                self.grid_manager.reset_grid_cycle(buy_grid_level)
         
         except GridLevelNotReadyError as e:
             self.logger.debug(f"Cannot process sell order: {e}")
 
-        except InsufficientBalanceError as e:
+        except InsufficientCryptoBalanceError as e:
             self.logger.warning(f"Cannot process sell order: {e}")
 
         except Exception as e:
             self.logger.error(f"Unexpected error while processing sell order: {e}")
 
-    async def _verify_order_conditions(self, grid_level: GridLevel, order_type: OrderType) -> None:
+    async def _verify_order_conditions(
+        self, 
+        grid_level: GridLevel, 
+        order_type: OrderType
+    ) -> None:
         if order_type == OrderType.BUY:
             if not grid_level.can_place_buy_order():
                 raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.cycle_state}")
@@ -130,7 +155,14 @@ class OrderManager:
             if not grid_level.can_place_sell_order():
                 raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a sell order, current state: {grid_level.cycle_state}")
     
-    async def _place_order(self, grid_level: GridLevel, order_type: OrderType, current_price: float, quantity: float, timestamp: Union[int, str]) -> None:
+    async def _place_order(
+        self, 
+        grid_level: GridLevel, 
+        order_type: OrderType, 
+        current_price: float, 
+        quantity: float,
+        timestamp: Union[int, str]
+    ) -> None:
         try:
             order_result = await self.order_execution_strategy.execute_order(order_type, self.config_manager.get_pair(), quantity, current_price)
 
@@ -151,7 +183,12 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"Failed to place {order_type} order at {current_price}: {e}")
 
-    async def _handle_order_placement(self, order: Order, grid_level: GridLevel, order_type: OrderType) -> None:
+    async def _handle_order_placement(
+        self, 
+        order: Order, 
+        grid_level: GridLevel, 
+        order_type: OrderType
+    ) -> None:
         if order_type == OrderType.BUY:
             grid_level.place_buy_order(order)
             await self.balance_tracker.update_after_buy(order.quantity, order.price)

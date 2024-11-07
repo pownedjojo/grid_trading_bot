@@ -1,5 +1,6 @@
 import pytest, logging
-from unittest.mock import AsyncMock, Mock, patch, call
+import pandas as pd
+from unittest.mock import AsyncMock, Mock
 from config.config_manager import ConfigManager
 from core.services.exchange_interface import ExchangeInterface
 from core.grid_management.grid_manager import GridManager
@@ -9,8 +10,6 @@ from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from strategies.plotter import Plotter
 from strategies.grid_trading_strategy import GridTradingStrategy
 from config.trading_mode import TradingMode
-from core.order_handling.order import OrderType
-import pandas as pd
 
 @pytest.mark.asyncio
 class TestGridTradingStrategy:
@@ -55,7 +54,7 @@ class TestGridTradingStrategy:
 
         strategy.initialize_strategy()
 
-        grid_manager.initialize_grid_levels.assert_called_once()
+        grid_manager.initialize_grids_and_levels.assert_called_once()
 
     async def test_stop_trading(self, setup_strategy):
         create_strategy, _, exchange_service, *_ = setup_strategy

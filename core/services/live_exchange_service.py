@@ -1,13 +1,16 @@
-import ccxt, logging, time, asyncio, os
+import ccxt, logging, asyncio, os
 import ccxt.pro as ccxtpro
-from typing import List, Dict, Union, Callable, Any
+from typing import List, Dict, Union, Callable, Any, Optional
 from config.config_manager import ConfigManager
-from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
 from .exchange_interface import ExchangeInterface
-from .exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError, MissingEnvironmentVariableError, InvalidOrderTypeError
+from .exceptions import UnsupportedExchangeError, DataFetchError, OrderCancellationError, MissingEnvironmentVariableError, InvalidOrderTypeError
 
 class LiveExchangeService(ExchangeInterface):
-    def __init__(self, config_manager: ConfigManager, is_paper_trading_activated: bool):
+    def __init__(
+        self, 
+        config_manager: ConfigManager, 
+        is_paper_trading_activated: bool
+    ):
         self.config_manager = config_manager
         self.is_paper_trading_activated = is_paper_trading_activated
         self.logger = logging.getLogger(__name__)
@@ -116,7 +119,13 @@ class LiveExchangeService(ExchangeInterface):
         except ccxt.BaseError as e:
             raise DataFetchError(f"Error fetching current price: {str(e)}")
 
-    async def place_order(self, pair: str, order_type: str, amount: float, price: float = None) -> dict:
+    async def place_order(
+        self, 
+        pair: str, 
+        order_type: str, 
+        amount: float, 
+        price: Optional[float] = None
+    ) -> Dict[str, Union[str, float]]:
         try:
             if order_type == "buy":
                 order = await self.exchange.create_limit_buy_order(pair, amount, price)
@@ -129,39 +138,39 @@ class LiveExchangeService(ExchangeInterface):
             return order
 
         except ValueError as e:
-            self.logger.error(f"Error placing order - invalid order type specified {str(e)}")
             raise InvalidOrderTypeError(f"Error placing order: {str(e)}")
 
         except ccxt.NetworkError as e:
-            self.logger.warning(f"Network error placing {order_type} order for {pair}: {str(e)}.")
             raise DataFetchError(f"Network issue occurred while placing order: {str(e)}")
 
         except ccxt.BaseError as e:
-            self.logger.error(f"Exchange error placing {order_type} order for {pair}: {str(e)}")
             raise DataFetchError(f"Error placing order: {str(e)}")
 
         except Exception as e:
-            self.logger.error(f"Unexpected error placing {order_type} order: {str(e)}")
             raise DataFetchError(f"Unexpected error placing order: {str(e)}")
 
-    async def get_order_status(self, order_id: str) -> Dict[str, Union[str, float]]:
+    async def get_order_status(
+        self, 
+        order_id: str
+    ) -> Dict[str, Union[str, float]]:
         try:
             order = await self.exchange.fetch_order(order_id)
             return order
 
         except ccxt.NetworkError as e:
-            self.logger.error(f"Network error while fetching order {order_id}: {str(e)}")
             raise DataFetchError(f"Network issue occurred while fetching order status: {str(e)}")
 
         except ccxt.BaseError as e:
-            self.logger.error(f"Exchange error while fetching order {order_id}: {str(e)}")
             raise DataFetchError(f"Exchange-specific error occurred: {str(e)}")
 
         except Exception as e:
-            self.logger.error(f"Unexpected error while fetching order {order_id}: {str(e)}")
             raise DataFetchError(f"Failed to fetch order status: {str(e)}")
 
-    async def cancel_order(self, order_id: str, pair: str) -> dict:
+    async def cancel_order(
+        self, 
+        order_id: str, 
+        pair: str
+    ) -> dict:
         try:
             self.logger.info(f"Attempting to cancel order {order_id} for pair {pair}")
             cancellation_result = await self.exchange.cancel_order(order_id, pair)
@@ -174,20 +183,22 @@ class LiveExchangeService(ExchangeInterface):
                 return cancellation_result
 
         except ccxt.OrderNotFound as e:
-            self.logger.warning(f"Order {order_id} not found for cancellation. It may already be completed or canceled.")
-            raise OrderCancellationError(error_msg) from e
+            raise OrderCancellationError(f"Order {order_id} not found for cancellation. It may already be completed or canceled.")
 
         except ccxt.NetworkError as e:
-            self.logger.error(f"Network error while canceling order {order_id}: {str(e)}")
-            raise OrderCancellationError(error_msg) from e
+            raise OrderCancellationError(f"Network error while canceling order {order_id}: {str(e)}")
 
         except ccxt.BaseError as e:
-            self.logger.error(f"Exchange error while canceling order {order_id}: {str(e)}")
-            raise OrderCancellationError(error_msg) from e
+            raise OrderCancellationError(f"Exchange error while canceling order {order_id}: {str(e)}")
 
         except Exception as e:
-            self.logger.error(f"Unexpected error while canceling order {order_id}: {str(e)}")
-            raise OrderCancellationError(error_msg) from e
+            raise OrderCancellationError(f"Unexpected error while canceling order {order_id}: {str(e)}")
 
-    def fetch_ohlcv(self, pair: str, timeframe: str, start_date: str, end_date: str) -> List[Dict[str, Union[float, int]]]:
+    def fetch_ohlcv(
+        self, 
+        pair: str, 
+        timeframe: str, 
+        start_date: str, 
+        end_date: str
+    ) -> List[Dict[str, Union[float, int]]]:
         raise NotImplementedError("fetch_ohlcv is not used in live or paper trading mode.")

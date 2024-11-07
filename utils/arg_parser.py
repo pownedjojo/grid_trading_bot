@@ -15,12 +15,15 @@ def parse_and_validate_console_args():
                 raise ValueError(f"The directory for saving performance results does not exist: {save_performance_dir}")
         
         return args
+
     except argparse.ArgumentError as e:
         logging.error(f"Argument parsing error: {e}")
         exit(1)
+
     except ValueError as e:
         logging.error(f"Validation error: {e}")
         exit(1)
+
     except Exception as e:
         logging.error(f"An unexpected error occurred while parsing arguments: {e}")
         logging.error(traceback.format_exc())

@@ -1,7 +1,11 @@
 import logging
 from typing import Optional
 
-def setup_logging(log_level: int, log_to_file: bool = False, log_file_path: Optional[str] = None) -> None:
+def setup_logging(
+    log_level: int, 
+    log_to_file: bool = False, 
+    log_file_path: Optional[str] = None
+) -> None:
     handlers = []
     handlers.append(logging.StreamHandler())
 

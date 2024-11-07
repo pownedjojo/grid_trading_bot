@@ -7,7 +7,11 @@ from config.trading_mode import TradingMode
 class NotificationHandler:
     _executor = ThreadPoolExecutor(max_workers=3)
 
-    def __init__(self, urls: Optional[List[str]], trading_mode: TradingMode):
+    def __init__(
+        self, 
+        urls: Optional[List[str]], 
+        trading_mode: TradingMode
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.enabled = bool(urls) and trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}
         self.lock = asyncio.Lock()
@@ -17,7 +21,11 @@ class NotificationHandler:
             for url in urls:
                 self.apprise_instance.add(url)
 
-    def send_notification(self, content: Union[NotificationType, str], **kwargs) -> None:
+    def send_notification(
+        self, 
+        content: Union[NotificationType, str],
+        **kwargs
+    ) -> None:
         if self.enabled and self.apprise_instance:
             if isinstance(content, NotificationType):
                 title = content.value.title
@@ -35,7 +43,11 @@ class NotificationHandler:
 
             self.apprise_instance.notify(title=title, body=message)
 
-    async def async_send_notification(self, content: Union[NotificationType, str], **kwargs) -> None:
+    async def async_send_notification(
+        self, 
+        content: Union[NotificationType, str], 
+        **kwargs
+    ) -> None:
         async with self.lock:  # Ensures no overlapping calls
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(self._executor, lambda: self.send_notification(content, **kwargs))

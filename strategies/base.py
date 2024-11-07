@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import Optional, Tuple, Union
 
 class TradingStrategy(ABC):
     """
@@ -43,7 +44,7 @@ class TradingStrategy(ABC):
         pass
 
     @abstractmethod
-    def generate_performance_report(self):
+    def generate_performance_report(self) -> Tuple[dict, list]:
         """
         Generates a report summarizing the strategy's performance (ROI, max drawdown, etc.).
         Must be implemented by any subclass.

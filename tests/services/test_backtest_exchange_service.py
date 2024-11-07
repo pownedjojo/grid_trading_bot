@@ -1,4 +1,4 @@
-import pytest, ccxt
+import pytest
 import pandas as pd
 from unittest.mock import Mock, patch
 from core.services.backtest_exchange_service import BacktestExchangeService

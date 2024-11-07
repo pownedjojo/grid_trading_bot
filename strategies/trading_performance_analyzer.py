@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union, Optional
 import pandas as pd
 import numpy as np
 from tabulate import tabulate
@@ -28,7 +28,7 @@ class TradingPerformanceAnalyzer:
         roi = (final_balance - self.initial_balance) / self.initial_balance * 100
         return round(roi, 2)
     
-    def _calculate_trading_gains(self) -> float:
+    def _calculate_trading_gains(self) -> str:
         total_buy_cost = 0
         total_sell_revenue = 0
         buy_orders = self.order_book.get_all_buy_orders()
@@ -98,7 +98,7 @@ class TradingPerformanceAnalyzer:
         orders.sort(key=lambda x: (x[3] is None, x[3]))  # x[3] is the timestamp, sort None to the end
         return orders
     
-    def _format_order(self, order: Order, grid_level: GridLevel) -> List[Union[str, float]]:
+    def _format_order(self, order: Order, grid_level: Optional[GridLevel]) -> List[Union[str, float]]:
         grid_level_price = grid_level.price if grid_level else "N/A"
         # Assuming order.price is the execution price and grid level price the expected price
         slippage = ((order.price - grid_level_price) / grid_level_price) * 100 if grid_level else "N/A"
@@ -159,7 +159,7 @@ class TradingPerformanceAnalyzer:
             "Grid Trading Gains": f"{grid_trading_gains}",
             "Total Fees": f"{total_fees:.2f}",
             "Final Balance (Fiat)": f"{final_balance:.2f}",
-            "Crypto Balance": f"{crypto_balance:.4f} {self.base_currency}",
+            "Final Crypto Balance": f"{crypto_balance:.4f} {self.base_currency}",
             "Final Crypto Value (Fiat)": f"{final_crypto_value:.2f} {self.quote_currency}",
             "Remaining Fiat Balance": f"{final_fiat_balance:.2f} {self.quote_currency}",
             "Number of Buy Trades": num_buy_trades,

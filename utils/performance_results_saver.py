@@ -1,9 +1,12 @@
 import json, os, logging
-from typing import Dict, List, Union, Any
+from typing import Dict, Any
 import pandas as pd
 from datetime import datetime, timedelta
 
-def save_or_append_performance_results(new_results: Dict[str, Any], file_path: str) -> None:
+def save_or_append_performance_results(
+    new_results: Dict[str, Any], 
+    file_path: str
+) -> None:
     try:
         if os.path.exists(file_path):
             with open(file_path, 'r') as json_file:
@@ -45,7 +48,9 @@ def save_or_append_performance_results(new_results: Dict[str, Any], file_path: s
             json.dump(all_results, json_file, indent=4)
 
         logging.info(f"Performance metrics saved to {file_path}")
+
     except (OSError, IOError) as e:
         logging.error(f"Failed to save performance metrics to {file_path}: {e}")
+
     except Exception as e:
         logging.error(f"An unexpected error occurred while saving performance metrics: {e}")

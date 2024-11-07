@@ -31,10 +31,10 @@ class TestPlotter:
         data = pd.DataFrame({"close": [100, 105, 110]}, index=[1, 2, 3])
         fig = plotter.create_base_figure(data)
         
-        grid_manager.grids = [90, 110, 130]
+        grid_manager.price_grids = [90, 110, 130]
         grid_manager.central_price = 100
 
-        plotter.add_grid_lines(fig, grid_manager.grids, grid_manager.central_price)
+        plotter.add_grid_lines(fig, grid_manager.price_grids, grid_manager.central_price)
 
         assert len(fig.data) == 4  # 1 close price line + 3 grid lines
         assert fig.data[1].line.color == "green"
@@ -64,7 +64,7 @@ class TestPlotter:
         plotter, grid_manager, order_book = setup_plotter
         data = pd.DataFrame({"close": [100, 105, 110]}, index=pd.date_range("2024-01-01", periods=3))
 
-        grid_manager.grids = [90, 110]
+        grid_manager.price_grids = [90, 110]
         grid_manager.central_price = 100
         order_book.get_all_buy_orders.return_value = [Order(price=95, quantity=1, order_type=OrderType.BUY, timestamp="2024-01-01T00:00:00Z")]
         order_book.get_all_sell_orders.return_value = [Order(price=105, quantity=1, order_type=OrderType.SELL, timestamp="2024-01-02T00:00:00Z")]

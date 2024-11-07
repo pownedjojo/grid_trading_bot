@@ -85,10 +85,6 @@ class ConfigManager:
         trading_settings = self.get_trading_settings()
         return trading_settings.get('historical_data_file', None)
 
-    def get_logging_level(self):
-        log_level = self.config.get('logging', {}).get('log_level', 'INFO')
-        return getattr(logging, log_level.upper(), logging.INFO)
-
     # --- Grid Accessor Methods ---
     def get_grid_settings(self):
         return self.config.get('grid_strategy', {})

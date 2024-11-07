@@ -1,5 +1,4 @@
 import logging, traceback, cProfile, asyncio, os
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from utils.arg_parser import parse_and_validate_console_args
@@ -25,7 +24,12 @@ from utils.logging_config import setup_logging
 from utils.notification.notification_handler import NotificationHandler
 
 class GridTradingBot:
-    def __init__(self, config_path: str, save_performance_results_path: Optional[str] = None, no_plot: bool = False):
+    def __init__(
+        self, 
+        config_path: str, 
+        save_performance_results_path: Optional[str] = None, 
+        no_plot: bool = False
+    ):
         try:
             self.config_path = config_path
             self.save_performance_results_path = save_performance_results_path
@@ -73,6 +77,7 @@ class GridTradingBot:
 
         except (ConfigError, UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
             self._log_and_exit(e)
+            
         except Exception as e:
             self.logger.error("An unexpected error occurred.")
             self.logger.error(traceback.format_exc())

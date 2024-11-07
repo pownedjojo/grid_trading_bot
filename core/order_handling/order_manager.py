@@ -122,6 +122,7 @@ class OrderManager:
 
         except Exception as e:
             self.logger.error(f"Unexpected error while processing buy order: {e}")
+            await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Unexpected error while processing buy order: {e}")
     
     async def _process_sell_order(
         self, 
@@ -156,6 +157,7 @@ class OrderManager:
 
         except Exception as e:
             self.logger.error(f"Unexpected error while processing sell order: {e}")
+            await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Unexpected error while processing sell order: {e}")
     
     async def _place_order(
         self, 

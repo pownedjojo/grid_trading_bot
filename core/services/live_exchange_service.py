@@ -62,14 +62,13 @@ class LiveExchangeService(ExchangeInterface):
         
         while self.connection_active:
             try:
-                self.logger.info(f"Connecting to WebSocket for {pair} ticker updates.")
                 ticker = await self.exchange.watch_ticker(pair)
+                current_price = ticker['last']
+                timestamp = ticker['timestamp'] / 1000.0  # Convert to seconds
+                self.logger.info(f"Connected to WebSocket for {pair} ticker current price: {current_price}")
 
                 if not self.connection_active:
                     break
-
-                current_price = ticker['last']
-                timestamp = ticker['timestamp'] / 1000.0  # Convert to seconds
 
                 await on_ticker_update(current_price, timestamp)
                 await asyncio.sleep(update_interval)

@@ -91,7 +91,8 @@ class GridTradingBot:
             if self.trading_mode == TradingMode.BACKTEST and not self.no_plot:
                 self.strategy.plot_results()
 
-            return self._generate_and_log_performance()
+            if self.trading_mode == TradingMode.BACKTEST:
+                return self._generate_and_log_performance()
 
         except (ConfigError, UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
             self._log_and_exit(e)
@@ -109,18 +110,11 @@ class GridTradingBot:
 
     def _generate_and_log_performance(self) -> Optional[Dict[str, Any]]:
         performance_summary, formatted_orders = self.strategy.generate_performance_report()
-        
-        if self.trading_mode == TradingMode.LIVE:
-            self.logger.info("Live trading session completed. Performance data available.")
-        elif self.trading_mode == TradingMode.PAPER_TRADING:
-            self.logger.info("Paper trading session completed. Review the performance summary.")
-        elif self.trading_mode == TradingMode.BACKTEST:
-            return {
-                "config": self.config_path,
-                "performance_summary": performance_summary,
-                "orders": formatted_orders
-            }
-        return None
+        return {
+            "config": self.config_path,
+            "performance_summary": performance_summary,
+            "orders": formatted_orders
+        }
 
     def _log_and_exit(self, exception: Exception) -> None:
         self.logger.error(f"{type(exception).__name__}: {exception}")

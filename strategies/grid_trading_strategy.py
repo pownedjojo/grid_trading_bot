@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from .base import TradingStrategy
 from config.trading_mode import TradingMode
-from core.order_handling.order import OrderType
+from core.order_handling.order import OrderSide
 from config.config_manager import ConfigManager
 from core.services.exchange_interface import ExchangeInterface
 from core.grid_management.grid_manager import GridManager
@@ -136,8 +136,8 @@ class GridTradingStrategy(TradingStrategy):
         previous_price: float, 
         current_timestamp: Union[int, str]
     ) -> None:
-        await self.order_manager.execute_order(OrderType.BUY, current_price, previous_price, current_timestamp)
-        await self.order_manager.execute_order(OrderType.SELL, current_price, previous_price, current_timestamp)
+        await self.order_manager.execute_order(OrderSide.BUY, current_price, previous_price, current_timestamp)
+        await self.order_manager.execute_order(OrderSide.SELL, current_price, previous_price, current_timestamp)
 
     async def _check_take_profit_stop_loss(
         self, 

@@ -1,6 +1,6 @@
 import time, logging, asyncio
 from typing import Optional
-from ..order import OrderType
+from ..order import OrderType, OrderSide
 from core.services.exchange_interface import ExchangeInterface
 from .order_execution_strategy import OrderExecutionStrategy
 from ..exceptions import OrderExecutionFailedError
@@ -19,16 +19,16 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
         self.max_slippage = max_slippage
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    async def execute_order(
+    async def execute_market_order(
         self, 
-        order_type: OrderType, 
+        order_side: OrderSide, 
         pair: str, 
         quantity: float, 
         price: float
     ) -> dict:
         for attempt in range(self.max_retries):
             try:
-                order = await self.exchange_service.place_order(pair, order_type.name.lower(), quantity, price)
+                order = await self.exchange_service.create_order(pair, OrderType.MARKET.value.lower(), order_side.name.lower(), quantity, price)
                 order_result = await self._normalize_order_result(order)
                 
                 if order_result['status'] == 'filled':
@@ -38,13 +38,28 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
 
                 await asyncio.sleep(self.retry_delay)
                 self.logger.info(f"Retrying order. Attempt {attempt + 1}/{self.max_retries}.")
-                price = await self._adjust_price(order_type, price, attempt)
+                price = await self._adjust_price(order_side, price, attempt)
 
             except Exception as e:
                 self.logger.error(f"Attempt {attempt + 1} failed with error: {str(e)}")
                 await asyncio.sleep(self.retry_delay)
 
-        raise OrderExecutionFailedError("Failed to execute limit order after maximum retries.", order_type, pair, quantity, price)
+        raise OrderExecutionFailedError("Failed to execute Market order after maximum retries.", order_side, OrderType.MARKET, pair, quantity, price)
+    
+    async def execute_limit_order(
+        self, 
+        order_side: OrderSide, 
+        pair: str, 
+        quantity: float, 
+        price: float
+    ) -> dict:
+        try:
+            order = await self.exchange_service.create_order(pair, OrderType.LIMIT.value.lower(), order_side.name.lower(), quantity, price)
+            order_result = await self._normalize_order_result(order)
+            return order_result
+        
+        except Exception as e:
+            raise OrderExecutionFailedError("Failed to execute Limit order:", order_side, OrderType.LIMIT, pair, quantity, price)
 
     async def _normalize_order_result(
         self, 
@@ -59,19 +74,19 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
             'filled_qty': raw_order_result.get('filled', 0.0),
             'remaining_qty': raw_order_result.get('remaining', 0.0),
             'timestamp': raw_order_result.get('timestamp', int(time.time())),
-            'filled_price': raw_order_result.get('average', None),  # Exchange-specific average price if available
+            'filled_price': raw_order_result.get('average', None),
             'fee': raw_order_result.get('fee', None),
             'cost': raw_order_result.get('cost', None)
         }
 
     async def _adjust_price(
         self, 
-        order_type: OrderType, 
+        order_side: OrderSide, 
         price: float, 
         attempt: int
     ) -> float:
         adjustment = self.max_slippage / self.max_retries * attempt
-        return price * (1 + adjustment) if order_type == OrderType.BUY else price * (1 - adjustment)
+        return price * (1 + adjustment) if order_side == OrderSide.BUY else price * (1 - adjustment)
     
     async def _handle_partial_fill(
         self, 

@@ -103,6 +103,7 @@ class TradingPerformanceAnalyzer:
         # Assuming order.price is the execution price and grid level price the expected price
         slippage = ((order.price - grid_level_price) / grid_level_price) * 100 if grid_level else "N/A"
         return [
+            order.order_side.name,
             order.order_type.name,
             order.price, 
             order.quantity, 
@@ -170,7 +171,7 @@ class TradingPerformanceAnalyzer:
 
         formatted_orders = self.get_formatted_orders()
 
-        orders_table = tabulate(formatted_orders, headers=["Order Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
+        orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
         self.logger.info("\nFormatted Orders:\n" + orders_table)
 
         summary_table = tabulate(performance_summary.items(), headers=["Metric", "Value"], tablefmt="grid")

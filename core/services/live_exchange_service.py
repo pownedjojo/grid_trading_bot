@@ -1,6 +1,7 @@
 import ccxt, logging, asyncio, os
 import ccxt.pro as ccxtpro
-from typing import List, Dict, Union, Callable, Any, Optional
+from typing import Dict, Union, Callable, Any, Optional
+import pandas as pd
 from config.config_manager import ConfigManager
 from .exchange_interface import ExchangeInterface
 from .exceptions import UnsupportedExchangeError, DataFetchError, OrderCancellationError, MissingEnvironmentVariableError, InvalidOrderTypeError
@@ -73,11 +74,11 @@ class LiveExchangeService(ExchangeInterface):
                 await on_ticker_update(current_price, timestamp)
                 await asyncio.sleep(update_interval)
 
-            except ccxtpro.NetworkError as e:
+            except ccxt.NetworkError as e:
                 self.logger.error(f"Network error while connecting to WebSocket: {e}. Retrying in 5 seconds...")
                 await asyncio.sleep(5)
 
-            except ccxtpro.ExchangeError as e:
+            except ccxt.ExchangeError as e:
                 self.logger.error(f"Exchange error while fetching ticker for {pair}: {e}. Retrying in 5 seconds...")
                 await asyncio.sleep(5)
 
@@ -192,6 +193,23 @@ class LiveExchangeService(ExchangeInterface):
 
         except Exception as e:
             raise OrderCancellationError(f"Unexpected error while canceling order {order_id}: {str(e)}")
+    
+    async def get_exchange_status(self) -> dict:
+        try:
+            status = await self.exchange.fetch_status()
+            return {
+                "status": status.get("status", "unknown"),
+                "updated": status.get("updated"),
+                "eta": status.get("eta"),
+                "url": status.get("url"),
+                "info": status.get("info", "No additional info available")
+            }
+
+        except AttributeError:
+            return {"status": "unsupported", "info": "fetch_status not supported by this exchange."}
+
+        except Exception as e:
+            return {"status": "error", "info": f"Failed to fetch exchange status: {e}"}
 
     def fetch_ohlcv(
         self, 
@@ -199,5 +217,5 @@ class LiveExchangeService(ExchangeInterface):
         timeframe: str, 
         start_date: str, 
         end_date: str
-    ) -> List[Dict[str, Union[float, int]]]:
+    ) -> pd.DataFrame:
         raise NotImplementedError("fetch_ohlcv is not used in live or paper trading mode.")

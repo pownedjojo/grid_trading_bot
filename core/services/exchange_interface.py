@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Union, List, Optional, Any
+from typing import Dict, Union, Optional, Any
+import pandas as pd
 
 class ExchangeInterface(ABC):
     @abstractmethod
@@ -25,7 +26,7 @@ class ExchangeInterface(ABC):
         timeframe: str, 
         start_date: str, 
         end_date: str
-    ) -> List[Dict[str, Union[float, int]]]:
+    ) -> pd.DataFrame:
         """
         Fetches historical OHLCV data as a list of dictionaries, each containing open, high, low,
         close, and volume for the specified time period.
@@ -55,4 +56,9 @@ class ExchangeInterface(ABC):
         pair: str
     ) -> Dict[str, Union[str, float]]:
         """Attempts to cancel an order by ID, returning the result of the cancellation."""
+        pass
+
+    @abstractmethod
+    async def get_exchange_status(self) -> dict:
+        """Fetches current exchange status."""
         pass

@@ -1,11 +1,21 @@
 from abc import ABC, abstractmethod
-from ..order import OrderType
+from ..order import OrderSide
 
 class OrderExecutionStrategy(ABC):
     @abstractmethod
-    async def execute_order(
+    async def execute_market_order(
         self, 
-        order_type: OrderType, 
+        order_side: OrderSide, 
+        pair: str, 
+        quantity: float,
+        price: float
+    ) -> dict:
+        pass
+
+    @abstractmethod
+    async def execute_limit_order(
+        self, 
+        order_side: OrderSide, 
         pair: str, 
         quantity: float, 
         price: float

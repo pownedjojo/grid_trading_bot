@@ -10,8 +10,6 @@ class GridManager:
         self.initial_balance: float = self.config_manager.get_initial_balance()
         self.price_grids: List[float]
         self.central_price: float
-        self.price_grids: List[float]
-        self.central_price: float
         self.sorted_buy_grids: List[float]
         self.sorted_sell_grids: List[float]
         self.grid_levels: dict[float, GridLevel] = {}

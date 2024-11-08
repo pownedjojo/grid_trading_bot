@@ -1,5 +1,5 @@
 import ccxt, logging, time, os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 import pandas as pd
 from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS
@@ -151,23 +151,36 @@ class BacktestExchangeService(ExchangeInterface):
                     self.logger.error(f"Failed after {retries} attempts: {e}")
                     raise DataFetchError(f"Failed to fetch data after {retries} attempts: {str(e)}")
 
-    def place_order(
+    async def place_order(
         self, 
         pair: str, 
         order_type: str, 
         amount: float, 
         price: Optional[float] = None
-    ) -> dict:
+    ) -> Dict[str, Union[str, float]]:
         raise NotImplementedError("place_order is not used in backtesting.")
 
-    def get_balance(self) -> Dict[str, Any]:
+    async def get_balance(self) -> Dict[str, Any]:
         raise NotImplementedError("get_balance is not used in backtesting.")
 
-    def get_current_price(self, pair: str) -> float:
+    async def get_current_price(
+        self, 
+        pair: str
+    ) -> float:
         raise NotImplementedError("get_current_price is not used in backtesting.")
 
-    def get_order_status(self, order_id: str) -> Dict[str, Any]:
+    async def get_order_status(
+        self, 
+        order_id: str
+    ) -> Dict[str, Union[str, float]]:
         raise NotImplementedError("get_order_status is not used in backtesting.")
 
-    def cancel_order(self, order_id: str) -> None:
+    async def cancel_order(
+        self, 
+        order_id: str, 
+        pair: str
+    ) -> Dict[str, Union[str, float]]:
         raise NotImplementedError("cancel_order is not used in backtesting.")
+
+    async def get_exchange_status(self) -> dict:
+        raise NotImplementedError("get_exchange_status is not used in backtesting.")

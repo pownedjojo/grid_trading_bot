@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Tuple
-from .order import Order, OrderType
+from .order import Order, OrderSide
 from ..grid_management.grid_level import GridLevel
 
 class OrderBook:
@@ -10,11 +10,11 @@ class OrderBook:
         self.order_to_grid_map: Dict[Order, GridLevel] = {}  # Mapping of Order -> GridLevel
     
     def add_order(
-        self, 
-        order: Order, 
+        self,
+        order: Order,
         grid_level: Optional[GridLevel] = None
     ) -> None:
-        if order.order_type == OrderType.BUY:
+        if order.order_side == OrderSide.BUY:
             self.buy_orders.append(order)
         else:
             self.sell_orders.append(order)

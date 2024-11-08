@@ -1,142 +1,55 @@
-import logging, traceback, cProfile, asyncio, os
+import cProfile, asyncio, os, logging
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
-from core.bot_controller.bot_controller import BotController
-from core.services.exchange_service_factory import ExchangeServiceFactory
-from strategies.grid_trading_strategy import GridTradingStrategy
-from strategies.plotter import Plotter
-from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
-from core.order_handling.order_manager import OrderManager
-from core.validation.transaction_validator import TransactionValidator
-from core.order_handling.fee_calculator import FeeCalculator
-from core.order_handling.balance_tracker import BalanceTracker
-from core.order_handling.order_book import OrderBook
-from core.grid_management.grid_manager import GridManager
-from core.order_handling.execution_strategy.order_execution_strategy_factory import OrderExecutionStrategyFactory
-from core.services.exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
+from core.bot_management.bot_controller.bot_controller import BotController
+from config.trading_mode import TradingMode
+from core.bot_management.notification.notification_handler import NotificationHandler
+from core.bot_management.grid_trading_bot import GridTradingBot
+from core.bot_management.health_check import HealthCheck
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
-from config.trading_mode import TradingMode
 from utils.logging_config import setup_logging
-from utils.notification.notification_handler import NotificationHandler
 
-class GridTradingBot:
-    def __init__(
-        self, 
-        config_path: str, 
-        save_performance_results_path: Optional[str] = None, 
-        no_plot: bool = False
-    ):
-        try:
-            self.config_path = config_path
-            self.save_performance_results_path = save_performance_results_path
-            self.no_plot = no_plot
-            self.logger = logging.getLogger(self.__class__.__name__)
-            self.config_manager = self._initialize_config_manager()
-            setup_logging(
-                self.config_manager.get_logging_level(),
-                self.config_manager.should_log_to_file(),
-                self.config_manager.get_log_filename()
-            )
-            self.trading_mode = self.config_manager.get_trading_mode()
-            self.logger.info(f"Starting Grid Trading Bot in {self.trading_mode.value} mode")
+def initialize_config(config_path: str) -> ConfigManager:
+    load_dotenv()
+    try:
+        return ConfigManager(config_path, ConfigValidator())
 
-            self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, self.trading_mode)
-            self.order_execution_strategy = OrderExecutionStrategyFactory.create(self.config_manager, self.exchange_service)
-            self.grid_manager = GridManager(self.config_manager)
-            self.transaction_validator = TransactionValidator()
-            self.fee_calculator = FeeCalculator(self.config_manager)
-            self.balance_tracker = BalanceTracker(self.fee_calculator, self.config_manager.get_initial_balance(), 0)
-            self.order_book = OrderBook()
-            notification_urls = os.getenv("APPRISE_NOTIFICATION_URLS", "").split(",")
-            self.notification_handler = NotificationHandler(notification_urls, self.trading_mode)
-
-            self.order_manager = OrderManager(
-                self.config_manager,
-                self.grid_manager,
-                self.transaction_validator,
-                self.balance_tracker,
-                self.order_book,
-                self.order_execution_strategy,
-                self.notification_handler
-            )
-            self.trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, self.order_book)
-            self.plotter = Plotter(self.grid_manager, self.order_book) if self.trading_mode == TradingMode.BACKTEST else None
-            self.strategy = GridTradingStrategy(
-                self.config_manager,
-                self.exchange_service,
-                self.grid_manager,
-                self.order_manager,
-                self.balance_tracker,
-                self.trading_performance_analyzer,
-                self.plotter
-            )
-
-        except (ConfigError, UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
-            self._log_and_exit(e)
-            
-        except Exception as e:
-            self.logger.error("An unexpected error occurred.")
-            self.logger.error(traceback.format_exc())
-            exit(1)
-
-    async def run(self) -> Optional[Dict[str, Any]]:
-        try:
-            self.strategy.initialize_strategy()
-            await self.strategy.run()
-
-            if self.trading_mode == TradingMode.BACKTEST and not self.no_plot:
-                self.strategy.plot_results()
-
-            if self.trading_mode == TradingMode.BACKTEST:
-                return self._generate_and_log_performance()
-
-        except (ConfigError, UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
-            self._log_and_exit(e)
-
-        except Exception as e:
-            self.logger.error("An unexpected error occurred.")
-            self.logger.error(traceback.format_exc())
-            exit(1)
-
-    def _initialize_config_manager(self) -> ConfigManager:
-        try:
-            return ConfigManager(self.config_path, ConfigValidator())
-        except ConfigError as e:
-            raise e
-
-    def _generate_and_log_performance(self) -> Optional[Dict[str, Any]]:
-        performance_summary, formatted_orders = self.strategy.generate_performance_report()
-        return {
-            "config": self.config_path,
-            "performance_summary": performance_summary,
-            "orders": formatted_orders
-        }
-
-    def _log_and_exit(self, exception: Exception) -> None:
-        self.logger.error(f"{type(exception).__name__}: {exception}")
+    except ConfigError as e:
+        logging.error(f"An error occured during the initialization of ConfigManager {e}")
         exit(1)
 
-async def run_bot_with_config(
+def initialize_notification_handler(config_manager: ConfigManager) -> NotificationHandler:
+    notification_urls = os.getenv("APPRISE_NOTIFICATION_URLS", "").split(",")
+    trading_mode = config_manager.get_trading_mode()
+    return NotificationHandler(notification_urls, trading_mode)
+
+async def run_bot(
     config_path: str,
     profile: bool = False, 
     save_performance_results_path: Optional[str] = None, 
     no_plot: bool = False
 ) -> Optional[Dict[str, Any]]:
-    load_dotenv()
-    bot = GridTradingBot(config_path, save_performance_results_path, no_plot)
+    config_manager = initialize_config(config_path)
+    setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_filename())
+    notification_handler = initialize_notification_handler(config_manager)
+    bot = GridTradingBot(config_path, config_manager, notification_handler, save_performance_results_path, no_plot)
     bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.trading_performance_analyzer)
+    health_check = HealthCheck(bot, notification_handler)
 
     if profile:
         cProfile.runctx("asyncio.run(bot.run())", globals(), locals(), "profile_results.prof")
         return None
     else:
         if bot.trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}:
-            bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.order_book)
-            await asyncio.gather(bot.run(), bot_controller.command_listener())
+            await asyncio.gather(
+                bot.run(), 
+                bot_controller.command_listener(),
+                health_check.start()
+            )
         else:
             await bot.run()
 
@@ -145,7 +58,7 @@ if __name__ == "__main__":
     
     async def main():
         tasks = [
-            run_bot_with_config(config_path, args.profile, args.save_performance_results, args.no_plot)
+            run_bot(config_path, args.profile, args.save_performance_results, args.no_plot)
             for config_path in args.config
         ]
         

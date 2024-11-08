@@ -51,6 +51,9 @@ class NotificationHandler:
         async with self.lock:
             loop = asyncio.get_running_loop()
             try:
-                await loop.run_in_executor(self._executor, lambda: self.send_notification(content, **kwargs))
+                await asyncio.wait_for(
+                    loop.run_in_executor(self._executor, lambda: self.send_notification(content, **kwargs)),
+                    timeout=5
+                )
             except Exception as e:
                 self.logger.error(f"Failed to send notification: {str(e)}")

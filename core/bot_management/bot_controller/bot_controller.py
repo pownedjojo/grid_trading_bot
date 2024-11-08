@@ -6,7 +6,12 @@ from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from .exceptions import CommandParsingError, BalanceRetrievalError, OrderRetrievalError, StrategyControlError
 
 class BotController:
-    def __init__(self, strategy: GridTradingStrategy, balance_tracker: BalanceTracker, trading_performance_analyzer: TradingPerformanceAnalyzer):
+    def __init__(
+        self, 
+        strategy: GridTradingStrategy, 
+        balance_tracker: BalanceTracker, 
+        trading_performance_analyzer: TradingPerformanceAnalyzer
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.strategy = strategy
         self.balance_tracker = balance_tracker
@@ -19,7 +24,7 @@ class BotController:
         
         while not self._stop_listener:
             try:
-                command = await loop.run_in_executor(None, input, "Enter command (quit, orders, balance, stop, restart): ")
+                command = await loop.run_in_executor(None, input, "Enter command (quit, orders, balance, stop, restart, pause): ")
                 await self._handle_command(command.strip().lower())
             except CommandParsingError as e:
                 self.logger.warning(f"Command error: {e}")
@@ -57,14 +62,16 @@ class BotController:
         try:
             self.logger.info("Shutting down bot...")
             await self.strategy.stop()
+
         except Exception as e:
             raise StrategyControlError(f"Error stopping the bot: {e}")
 
     async def _display_orders(self):
         try:
             formatted_orders = self.trading_performance_analyzer.get_formatted_orders()
-            orders_table = tabulate(formatted_orders, headers=["Order Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
+            orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
             self.logger.info("\nFormatted Orders:\n" + orders_table)
+
         except Exception as e:
             raise OrderRetrievalError(f"Error retrieving orders: {e}")
 
@@ -74,6 +81,7 @@ class BotController:
             crypto_balance = self.balance_tracker.crypto_balance
             self.logger.info(f"Current Fiat balance: {current_balance}")
             self.logger.info(f"Current Crypto balance: {crypto_balance}")
+
         except Exception as e:
             raise BalanceRetrievalError(f"Error retrieving balance: {e}")
 
@@ -81,6 +89,7 @@ class BotController:
         try:
             await self.strategy.stop()
             self.logger.info("Trading halted successfully.")
+
         except Exception as e:
             raise StrategyControlError(f"Error stopping the strategy: {e}")
 
@@ -88,6 +97,7 @@ class BotController:
         try:
             await self.strategy.restart()
             self.logger.info("Trading resumed successfully.")
+
         except Exception as e:
             raise StrategyControlError(f"Error restarting the strategy: {e}")
 
@@ -99,7 +109,9 @@ class BotController:
             await asyncio.sleep(duration)
             self.logger.info("Resuming bot after pause.")
             await self.strategy.restart()
+
         except ValueError:
             raise CommandParsingError("Invalid pause duration. Please specify in seconds.")
+            
         except Exception as e:
             raise StrategyControlError(f"Error during pause operation: {e}")

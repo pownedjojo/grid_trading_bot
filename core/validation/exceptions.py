@@ -13,3 +13,7 @@ class GridLevelNotReadyError(Exception):
 class InvalidOrderTypeError(Exception):
     """Raised when an invalid order type is provided during order initialization."""
     pass
+
+class InvalidOrderSideError(Exception):
+    """Raised when an invalid order side is provided during order initialization."""
+    pass

@@ -1,11 +1,10 @@
-from ccxt.okx import Order
-from ..order_handling.order import OrderType
+from ..order_handling.order import OrderSide
 from ..grid_management.grid_level import GridLevel
 from .exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 
 class TransactionValidator:
     def __init__(
-        self, 
+        self,
         tolerance: float = 1e-6
     ):
         self.tolerance: float = tolerance
@@ -18,7 +17,7 @@ class TransactionValidator:
         grid_level: GridLevel
     ) -> None:
         self._check_balance(balance, quantity, price, grid_level)
-        self._check_grid_level(grid_level, OrderType.BUY)
+        self._check_grid_level(grid_level, OrderSide.BUY)
 
     def validate_sell_order(
         self, 
@@ -27,7 +26,7 @@ class TransactionValidator:
         grid_level: GridLevel
     ) -> None:
         self._check_crypto_balance(crypto_balance, quantity, grid_level)
-        self._check_grid_level(grid_level, OrderType.SELL)
+        self._check_grid_level(grid_level, OrderSide.SELL)
 
     def _check_balance(
         self, 
@@ -52,9 +51,9 @@ class TransactionValidator:
     def _check_grid_level(
         self, 
         grid_level: GridLevel, 
-        order_type: OrderType
+        order_side: OrderSide
     ) -> None:
-        if order_type == OrderType.BUY:
+        if order_side == OrderSide.BUY:
             if not grid_level.can_place_buy_order():
                 raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.cycle_state}")
         else:  # SELL

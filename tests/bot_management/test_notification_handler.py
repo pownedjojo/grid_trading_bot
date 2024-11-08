@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import patch
-from core.order_handling.order import Order, OrderType
-from utils.notification.notification_handler import NotificationHandler
-from utils.notification.notification_content import NotificationType
+from core.order_handling.order import Order, OrderType, OrderSide
+from core.bot_management.notification.notification_handler import NotificationHandler
+from core.bot_management.notification.notification_content import NotificationType
 from config.trading_mode import TradingMode
 
 class TestNotificationHandler:
@@ -34,7 +34,7 @@ class TestNotificationHandler:
     @pytest.mark.asyncio
     async def test_send_notification_with_predefined_content(self, mock_notify, notification_handler_enabled):
         handler = notification_handler_enabled
-        order_placed =  Order(price=1000, quantity=5, order_type=OrderType.BUY, timestamp="2024-01-01T00:00:00Z")
+        order_placed = Order(identifier="123", price=1000, quantity=5, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")
 
         handler.send_notification(NotificationType.ORDER_PLACED,  order_details=order_placed)
 
@@ -42,7 +42,7 @@ class TestNotificationHandler:
             title="Order Placed",
             body=(
                 "New order placed successfully:\n"
-                "(OrderType.BUY Order, price=1000, quantity=5, timestamp=2024-01-01T00:00:00Z, state=OrderState.PENDING)"
+                "Id=123, side=OrderSide.BUY, type=OrderType.MARKET, price=1000, quantity=5, timestamp=2024-01-01T00:00:00Z, state=OrderState.PENDING"
             )
         )
 
@@ -68,7 +68,7 @@ class TestNotificationHandler:
         mock_notify.assert_not_called()
 
     @patch("apprise.Apprise.notify")
-    @patch("utils.notification.notification_handler.logging.Logger.warning")
+    @patch("core.bot_management.notification.notification_handler.logging.Logger.warning")
     @pytest.mark.asyncio
     async def test_send_notification_with_missing_placeholder(self, mock_log_warning, mock_notify, notification_handler_enabled):
         handler = notification_handler_enabled

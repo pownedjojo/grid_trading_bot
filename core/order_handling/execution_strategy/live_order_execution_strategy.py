@@ -2,6 +2,7 @@ import time, logging, asyncio
 from typing import Optional
 from ..order import OrderType, OrderSide
 from core.services.exchange_interface import ExchangeInterface
+from core.services.exceptions import DataFetchError
 from .order_execution_strategy import OrderExecutionStrategy
 from ..exceptions import OrderExecutionFailedError
 
@@ -28,7 +29,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     ) -> dict:
         for attempt in range(self.max_retries):
             try:
-                order = await self.exchange_service.create_order(pair, OrderType.MARKET.value.lower(), order_side.name.lower(), quantity, price)
+                order = await self.exchange_service.place_order(pair, OrderType.MARKET.value.lower(), order_side.name.lower(), quantity, price)
                 order_result = await self._normalize_order_result(order)
                 
                 if order_result['status'] == 'filled':
@@ -54,12 +55,17 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
         price: float
     ) -> dict:
         try:
-            order = await self.exchange_service.create_order(pair, OrderType.LIMIT.value.lower(), order_side.name.lower(), quantity, price)
+            order = await self.exchange_service.place_order(pair, OrderType.LIMIT.value.lower(), order_side.name.lower(), quantity, price)
             order_result = await self._normalize_order_result(order)
             return order_result
         
+        except DataFetchError as e:
+            self.logger.error(f"DataFetchError during order execution for {pair} - {e}")
+            raise OrderExecutionFailedError(f"Failed to execute Limit order on {pair}: {e}", order_side, OrderType.LIMIT, pair, quantity, price)
+
         except Exception as e:
-            raise OrderExecutionFailedError("Failed to execute Limit order:", order_side, OrderType.LIMIT, pair, quantity, price)
+            self.logger.error(f"Unexpected error in execute_limit_order: {e}")
+            raise OrderExecutionFailedError(f"Unexpected error during order execution: {e}", order_side, OrderType.LIMIT, pair, quantity, price)
 
     async def _normalize_order_result(
         self, 

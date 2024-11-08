@@ -4,7 +4,7 @@ import pandas as pd
 from plotly.graph_objects import Figure
 from core.grid_management.grid_manager import GridManager
 from core.order_handling.order_book import OrderBook
-from core.order_handling.order import Order, OrderType
+from core.order_handling.order import Order, OrderType, OrderSide
 from strategies.plotter import Plotter
 
 class TestPlotter:
@@ -45,8 +45,8 @@ class TestPlotter:
         plotter, _, order_book = setup_plotter
         fig = Figure()
 
-        buy_order = Order(price=100, quantity=1, order_type=OrderType.BUY, timestamp="2024-01-01T00:00:00Z")
-        sell_order = Order(price=120, quantity=1, order_type=OrderType.SELL, timestamp="2024-01-02T00:00:00Z")
+        buy_order = Order(identifier="123", price=1000, quantity=5, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")
+        sell_order = Order(identifier="321", price=1200, quantity=3, order_side= OrderSide.SELL, order_type=OrderType.MARKET, timestamp="2024-01-02T00:00:00Z")
         
         order_book.get_all_buy_orders.return_value = [buy_order]
         order_book.get_all_sell_orders.return_value = [sell_order]
@@ -56,8 +56,8 @@ class TestPlotter:
         assert len(fig.data) == 2  # One marker for each order
         assert fig.data[0].marker.color == "green"  # Buy order
         assert fig.data[1].marker.color == "red"    # Sell order
-        assert fig.data[0].text == "Buy\nPrice: 100\nQty: 1\nDate: 2024-01-01T00:00:00Z"
-        assert fig.data[1].text == "Sell\nPrice: 120\nQty: 1\nDate: 2024-01-02T00:00:00Z"
+        assert fig.data[0].text == "Buy\nPrice: 1000\nQty: 5\nDate: 2024-01-01T00:00:00Z"
+        assert fig.data[1].text == "Sell\nPrice: 1200\nQty: 3\nDate: 2024-01-02T00:00:00Z"
 
     @patch("plotly.graph_objects.Figure.show")
     def test_plot_results(self, mock_show, setup_plotter):
@@ -66,8 +66,8 @@ class TestPlotter:
 
         grid_manager.price_grids = [90, 110]
         grid_manager.central_price = 100
-        order_book.get_all_buy_orders.return_value = [Order(price=95, quantity=1, order_type=OrderType.BUY, timestamp="2024-01-01T00:00:00Z")]
-        order_book.get_all_sell_orders.return_value = [Order(price=105, quantity=1, order_type=OrderType.SELL, timestamp="2024-01-02T00:00:00Z")]
+        order_book.get_all_buy_orders.return_value = [Order(identifier="123", price=1000, quantity=95, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")]
+        order_book.get_all_sell_orders.return_value = [Order(identifier="123", price=1000, quantity=5, order_side= OrderSide.SELL, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")]
 
         plotter.plot_results(data)
         

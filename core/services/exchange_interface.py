@@ -12,6 +12,7 @@ class ExchangeInterface(ABC):
     async def place_order(
         self, 
         pair: str, 
+        order_side: str, 
         order_type: str, 
         amount: float, 
         price: Optional[float] = None

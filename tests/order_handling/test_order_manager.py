@@ -7,7 +7,7 @@ from core.services.exchange_interface import ExchangeInterface
 from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
 from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
 from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
-from utils.notification.notification_content import NotificationType
+from core.bot_management.notification.notification_content import NotificationType
 
 class TestOrderManager:
     @pytest.fixture

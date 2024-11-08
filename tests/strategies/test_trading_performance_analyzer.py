@@ -2,7 +2,7 @@ import pytest, logging
 from pytest import approx
 from unittest.mock import Mock
 import pandas as pd
-from core.order_handling.order import Order, OrderType
+from core.order_handling.order import Order, OrderType, OrderSide
 from core.grid_management.grid_level import GridLevel
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 
@@ -49,8 +49,9 @@ class TestPerformanceAnalyzer:
     def test_calculate_trading_gains(self, setup_performance_analyzer):
         analyzer, _, order_book = setup_performance_analyzer
 
-        order_book.get_all_buy_orders.return_value = [Order(order_type=OrderType.BUY, price=1000, quantity=1, timestamp="2024-01-01T00:00:00Z")]
-        order_book.get_all_sell_orders.return_value = [Order(order_type=OrderType.SELL, price=1200, quantity=1, timestamp="2024-01-02T00:00:00Z")]
+
+        order_book.get_all_buy_orders.return_value = [Order(identifier="123", price=1000, quantity=1, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")]
+        order_book.get_all_sell_orders.return_value = [Order(identifier="321", price=1200, quantity=1, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-02T00:00:00Z")]
 
         trading_gains = analyzer._calculate_trading_gains()
         assert trading_gains == "197.80"
@@ -77,8 +78,8 @@ class TestPerformanceAnalyzer:
     def test_get_formatted_orders(self, setup_performance_analyzer):
         analyzer, _, order_book = setup_performance_analyzer
 
-        buy_order = Order(order_type=OrderType.BUY, price=1000, quantity=1, timestamp="2024-01-01T00:00:00Z")
-        sell_order = Order(order_type=OrderType.SELL, price=1200, quantity=1, timestamp="2024-01-02T00:00:00Z")
+        buy_order = Order(identifier="123", price=1000, quantity=1, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")
+        sell_order = Order(identifier="321", price=1200, quantity=1, order_side= OrderSide.SELL, order_type=OrderType.MARKET, timestamp="2024-01-02T00:00:00Z")
         grid_level = GridLevel(price=1000, cycle_state="active")
 
         order_book.get_buy_orders_with_grid.return_value = [(buy_order, grid_level)]
@@ -88,18 +89,20 @@ class TestPerformanceAnalyzer:
 
         assert len(formatted_orders) == 2
         assert formatted_orders[0][0] == "BUY"
-        assert formatted_orders[0][1] == 1000
-        assert formatted_orders[0][2] == 1
-        assert formatted_orders[0][3] == "2024-01-01T00:00:00Z"
-        assert formatted_orders[0][4] == 1000  # Grid level price
-        assert "N/A" not in formatted_orders[0][5]  # Slippage calculated
+        assert formatted_orders[0][1] == "MARKET"
+        assert formatted_orders[0][2] == 1000
+        assert formatted_orders[0][3] == 1
+        assert formatted_orders[0][4] == "2024-01-01T00:00:00Z"
+        assert formatted_orders[0][5] == 1000  # Grid level price
+        assert "N/A" not in formatted_orders[0][6]  # Slippage calculated
 
         assert formatted_orders[1][0] == "SELL"
-        assert formatted_orders[1][1] == 1200
-        assert formatted_orders[1][2] == 1
-        assert formatted_orders[1][3] == "2024-01-02T00:00:00Z"
-        assert formatted_orders[1][4] == 1000  # Grid level price
-        assert "N/A" not in formatted_orders[1][5]  # Slippage calculated
+        assert formatted_orders[1][1] == "MARKET"
+        assert formatted_orders[1][2] == 1200
+        assert formatted_orders[1][3] == 1
+        assert formatted_orders[1][4] == "2024-01-02T00:00:00Z"
+        assert formatted_orders[1][5] == 1000  # Grid level price
+        assert "N/A" not in formatted_orders[1][6]  # Slippage calculated
     
     def test_get_formatted_orders_empty(self, setup_performance_analyzer):
         analyzer, _, order_book = setup_performance_analyzer
@@ -117,8 +120,8 @@ class TestPerformanceAnalyzer:
         final_crypto_price = 20000
         total_fees = 50
 
-        buy_order = Order(order_type=OrderType.BUY, price=1000, quantity=1, timestamp="2024-01-01T00:00:00Z")
-        sell_order = Order(order_type=OrderType.SELL, price=1200, quantity=1, timestamp="2024-01-02T00:00:00Z")
+        buy_order = Order(identifier="123", price=1000, quantity=1, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")
+        sell_order = Order(identifier="321", price=1200, quantity=1, order_side= OrderSide.SELL, order_type=OrderType.MARKET, timestamp="2024-01-02T00:00:00Z")
         grid_level = GridLevel(price=1000, cycle_state="completed")
 
         order_book.get_all_buy_orders.return_value = [buy_order]
@@ -161,19 +164,21 @@ class TestPerformanceAnalyzer:
         
         # Check structure and content for buy order
         assert buy_formatted[0] == "BUY"
-        assert buy_formatted[1] == 1000  # Price of the buy order
-        assert buy_formatted[2] == 1  # Quantity of the buy order
-        assert buy_formatted[3] == "2024-01-01T00:00:00Z"  # Timestamp
-        assert buy_formatted[4] == 1000  # Grid level price
-        assert buy_formatted[5] == "0.00%"  # Slippage
+        assert buy_formatted[1] == "MARKET"
+        assert buy_formatted[2] == 1000  # Price of the buy order
+        assert buy_formatted[3] == 1  # Quantity of the buy order
+        assert buy_formatted[4] == "2024-01-01T00:00:00Z"  # Timestamp
+        assert buy_formatted[5] == 1000  # Grid level price
+        assert buy_formatted[6] == "0.00%"  # Slippage
 
         # Check structure and content for sell order
         assert sell_formatted[0] == "SELL"
-        assert sell_formatted[1] == 1200  # Price of the sell order
-        assert sell_formatted[2] == 1  # Quantity of the sell order
-        assert sell_formatted[3] == "2024-01-02T00:00:00Z"  # Timestamp
-        assert sell_formatted[4] == 1000  # Grid level price
-        assert sell_formatted[5] == "20.00%"  # Slippage calculated as (1200 - 1000) / 1000 * 100
+        assert sell_formatted[1] == "MARKET"
+        assert sell_formatted[2] == 1200  # Price of the sell order
+        assert sell_formatted[3] == 1  # Quantity of the sell order
+        assert sell_formatted[4] == "2024-01-02T00:00:00Z"  # Timestamp
+        assert sell_formatted[5] == 1000  # Grid level price
+        assert sell_formatted[6] == "20.00%"  # Slippage calculated as (1200 - 1000) / 1000 * 100
 
         # Logging output assertions
         log_messages = [record.message for record in caplog.records]

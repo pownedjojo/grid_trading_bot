@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
-from core.bot_controller.bot_controller import BotController
 from strategies.grid_trading_strategy import GridTradingStrategy
 from core.order_handling.balance_tracker import BalanceTracker
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
-from core.bot_controller.exceptions import CommandParsingError, BalanceRetrievalError, OrderRetrievalError, StrategyControlError
+from core.bot_management.bot_controller.bot_controller import BotController
+from core.bot_management.bot_controller.exceptions import BalanceRetrievalError, OrderRetrievalError
 
 @pytest.mark.asyncio
 class TestBotController:
@@ -91,7 +91,7 @@ class TestBotController:
         strategy.restart.assert_called_once_with()
 
     @patch("builtins.input", side_effect=["unknown", "quit"])
-    @patch("core.bot_controller.bot_controller.logging.Logger.warning")
+    @patch("core.bot_management.bot_controller.bot_controller.logging.Logger.warning")
     async def test_command_listener_unknown_command(self, mock_log_warning, mock_input, setup_bot_controller):
         bot_controller, _, _, _ = setup_bot_controller
 

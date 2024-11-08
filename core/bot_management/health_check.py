@@ -1,11 +1,13 @@
 import asyncio, psutil, logging
+from core.bot_management.grid_trading_bot import GridTradingBot
+from core.bot_management.notification.notification_handler import NotificationHandler
 from utils.constants import RESSOURCE_THRESHOLDS
 
 class HealthCheck:
     def __init__(
         self, 
-        bot, 
-        notification_handler,
+        bot: GridTradingBot, 
+        notification_handler: NotificationHandler,
         check_interval: int = 60
     ):
         self.logger = logging.getLogger(self.__class__.__name__)

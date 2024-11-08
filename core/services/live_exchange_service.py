@@ -4,7 +4,7 @@ from typing import Dict, Union, Callable, Any, Optional
 import pandas as pd
 from config.config_manager import ConfigManager
 from .exchange_interface import ExchangeInterface
-from .exceptions import UnsupportedExchangeError, DataFetchError, OrderCancellationError, MissingEnvironmentVariableError, InvalidOrderTypeError
+from .exceptions import UnsupportedExchangeError, DataFetchError, OrderCancellationError, MissingEnvironmentVariableError
 
 class LiveExchangeService(ExchangeInterface):
     def __init__(
@@ -122,23 +122,14 @@ class LiveExchangeService(ExchangeInterface):
     async def place_order(
         self, 
         pair: str, 
+        order_side: str, 
         order_type: str, 
         amount: float, 
         price: Optional[float] = None
     ) -> Dict[str, Union[str, float]]:
         try:
-            if order_type == "buy":
-                order = await self.exchange.create_limit_buy_order(pair, amount, price)
-            elif order_type == "sell":
-                order = await self.exchange.create_limit_sell_order(pair, amount, price)
-            else:
-                raise ValueError("Invalid order type specified. Must be 'buy' or 'sell'.")
-
-            self.logger.info(f"Placed {order_type} order: {order}")
+            order = await self.exchange.create_order(pair, order_type, order_side, amount, price)
             return order
-
-        except ValueError as e:
-            raise InvalidOrderTypeError(f"Error placing order: {str(e)}")
 
         except ccxt.NetworkError as e:
             raise DataFetchError(f"Network issue occurred while placing order: {str(e)}")

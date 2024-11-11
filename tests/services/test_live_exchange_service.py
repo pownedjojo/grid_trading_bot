@@ -92,22 +92,9 @@ class TestLiveExchangeService:
         mock_ccxt.binance.return_value = mock_exchange_instance
 
         service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
-        result = await service.place_order("BTC/USD", "buy", 1, 50000.0)
+        await service.place_order("BTC/USD", "buy", "limit", 1, 50000.0)
 
-        assert result["status"] == "filled"
-        mock_exchange_instance.create_limit_buy_order.assert_called_once_with("BTC/USD", 1, 50000.0)
-
-    @patch("core.services.live_exchange_service.getattr")
-    @pytest.mark.asyncio
-    async def test_place_order_invalid_type_raises_error(self, mock_getattr, config_manager, setup_env_vars):
-        mock_exchange_instance = AsyncMock()
-
-        mock_getattr.return_value = mock_exchange_instance
-
-        service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
-
-        with pytest.raises(InvalidOrderTypeError, match="Error placing order: Invalid order type specified"):
-            await service.place_order("BTC/USD", "invalid_type", 1, 50000.0)
+        mock_exchange_instance.create_order.assert_called_once_with("BTC/USD", "limit", "buy", 1, 50000.0)
 
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
@@ -120,7 +107,7 @@ class TestLiveExchangeService:
         service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
 
         with pytest.raises(DataFetchError, match="Unexpected error placing order"):
-            await service.place_order("BTC/USD", "buy", 1, 50000.0)
+            await service.place_order("BTC/USD", "buy", "market", 1, 50000.0)
 
     @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")
@@ -161,3 +148,66 @@ class TestLiveExchangeService:
         # Assert NotImplementedError is raised for fetch_ohlcv
         with pytest.raises(NotImplementedError, match="fetch_ohlcv is not used in live or paper trading mode."):
             service.fetch_ohlcv("BTC/USD", "1m", "start_date", "end_date")
+    
+    @patch("core.services.live_exchange_service.getattr")
+    @patch("core.services.live_exchange_service.ccxt")
+    @pytest.mark.asyncio
+    async def test_get_exchange_status_ok(self, mock_ccxt, mock_getattr, setup_env_vars, config_manager):
+        mock_exchange_instance = Mock()
+        mock_ccxt.binance.return_value = mock_exchange_instance
+        mock_getattr.return_value = mock_ccxt.binance
+
+        service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
+
+        service.exchange.fetch_status = AsyncMock(return_value={
+            "status": "ok",
+            "updated": 1622505600000,
+            "eta": None,
+            "url": "https://status.exchange.com",
+            "info": "All systems operational."
+        })
+
+        result = await service.get_exchange_status()
+
+        assert result == {
+            "status": "ok",
+            "updated": 1622505600000,
+            "eta": None,
+            "url": "https://status.exchange.com",
+            "info": "All systems operational."
+        }
+
+    @patch("core.services.live_exchange_service.getattr")
+    @patch("core.services.live_exchange_service.ccxt")
+    @pytest.mark.asyncio
+    async def test_get_exchange_status_unsupported(self, mock_ccxt, mock_getattr, setup_env_vars, config_manager):
+        mock_exchange_instance = Mock()
+        mock_ccxt.binance.return_value = mock_exchange_instance
+        mock_getattr.return_value = mock_ccxt.binance
+
+        service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
+        service.exchange.fetch_status.side_effect = AttributeError
+
+        result = await service.get_exchange_status()
+
+        assert result == {
+            "status": "unsupported",
+            "info": "fetch_status not supported by this exchange."
+        }
+    
+    @patch("core.services.live_exchange_service.getattr")
+    @patch("core.services.live_exchange_service.ccxt")
+    @pytest.mark.asyncio
+    async def test_get_exchange_status_error(self, mock_ccxt, mock_getattr, setup_env_vars, config_manager):
+        mock_exchange_instance = Mock()
+        mock_ccxt.binance.return_value = mock_exchange_instance
+        mock_getattr.return_value = mock_ccxt.binance
+
+        service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
+        service.exchange.fetch_status.side_effect = Exception("Network error")
+
+        result = await service.get_exchange_status()
+
+        assert result["status"] == "error"
+        assert "Failed to fetch exchange status" in result["info"]
+        assert "Network error" in result["info"]

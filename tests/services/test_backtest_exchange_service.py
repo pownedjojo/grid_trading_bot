@@ -143,32 +143,44 @@ class TestBacktestExchangeService:
         with pytest.raises(UnsupportedTimeframeError):
             service.fetch_ohlcv("BTC/USD", "5m", "2021-06-01", "2021-06-02")
 
-    def test_place_order_not_implemented(self, config_manager):
+    @pytest.mark.asyncio
+    async def test_place_order_not_implemented(self, config_manager):
         service = BacktestExchangeService(config_manager)
 
         with pytest.raises(NotImplementedError, match="place_order is not used in backtesting"):
-            service.place_order("BTC/USD", "buy", 1)
+            await service.place_order("BTC/USD", "buy", "market", 1, 1000)
 
-    def test_get_balance_not_implemented(self, config_manager):
+    @pytest.mark.asyncio
+    async def test_get_balance_not_implemented(self, config_manager):
         service = BacktestExchangeService(config_manager)
 
         with pytest.raises(NotImplementedError, match="get_balance is not used in backtesting"):
-            service.get_balance()
+            await service.get_balance()
 
-    def test_get_current_price_not_implemented(self, config_manager):
+    @pytest.mark.asyncio
+    async def test_get_current_price_not_implemented(self, config_manager):
         service = BacktestExchangeService(config_manager)
 
         with pytest.raises(NotImplementedError, match="get_current_price is not used in backtesting"):
-            service.get_current_price("BTC/USD")
+            await service.get_current_price("BTC/USD")
 
-    def test_get_order_status_not_implemented(self, config_manager):
+    @pytest.mark.asyncio
+    async def test_get_order_status_not_implemented(self, config_manager):
         service = BacktestExchangeService(config_manager)
 
         with pytest.raises(NotImplementedError, match="get_order_status is not used in backtesting"):
-            service.get_order_status("order_id")
+            await service.get_order_status("order_id")
 
-    def test_cancel_order_not_implemented(self, config_manager):
+    @pytest.mark.asyncio
+    async def test_cancel_order_not_implemented(self, config_manager):
         service = BacktestExchangeService(config_manager)
 
         with pytest.raises(NotImplementedError, match="cancel_order is not used in backtesting"):
-            service.cancel_order("order_id")
+            await service.cancel_order("order_id", "BTC/USD")
+    
+    @pytest.mark.asyncio
+    async def test_get_exchange_status_not_implemented(self, config_manager):
+        service = BacktestExchangeService(config_manager)
+
+        with pytest.raises(NotImplementedError, match="get_exchange_status is not used in backtesting"):
+            await service.get_exchange_status()

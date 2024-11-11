@@ -1,11 +1,11 @@
 from unittest.mock import Mock
 from core.order_handling.order_book import OrderBook
-from core.order_handling.order import OrderType
+from core.order_handling.order import OrderSide
 
 class TestOrderBook:
     def test_add_buy_order_with_grid(self):
         order_book = OrderBook()
-        buy_order = Mock(order_type=OrderType.BUY)
+        buy_order = Mock(order_side=OrderSide.BUY)
         grid_level = Mock()
 
         order_book.add_order(buy_order, grid_level)
@@ -16,7 +16,7 @@ class TestOrderBook:
 
     def test_add_sell_order_with_grid(self):
         order_book = OrderBook()
-        sell_order = Mock(order_type=OrderType.SELL)
+        sell_order = Mock(order_side=OrderSide.SELL)
         grid_level = Mock()
 
         order_book.add_order(sell_order, grid_level)
@@ -27,7 +27,7 @@ class TestOrderBook:
 
     def test_add_non_grid_order(self):
         order_book = OrderBook()
-        take_profit_order = Mock(order_type=OrderType.SELL)
+        take_profit_order = Mock(order_side=OrderSide.SELL)
 
         # Add non-grid order without grid level
         order_book.add_order(take_profit_order)
@@ -37,7 +37,7 @@ class TestOrderBook:
 
     def test_get_buy_orders_with_grid(self):
         order_book = OrderBook()
-        buy_order = Mock(order_type=OrderType.BUY)
+        buy_order = Mock(order_side=OrderSide.BUY)
         grid_level = Mock()
 
         order_book.add_order(buy_order, grid_level)
@@ -48,7 +48,7 @@ class TestOrderBook:
 
     def test_get_sell_orders_with_grid(self):
         order_book = OrderBook()
-        sell_order = Mock(order_type=OrderType.SELL)
+        sell_order = Mock(order_side=OrderSide.SELL)
         grid_level = Mock()
 
         order_book.add_order(sell_order, grid_level)
@@ -59,7 +59,7 @@ class TestOrderBook:
 
     def test_get_non_grid_orders(self):
         order_book = OrderBook()
-        non_grid_order = Mock(order_type=OrderType.SELL)
+        non_grid_order = Mock(order_side=OrderSide.SELL)
 
         order_book.add_order(non_grid_order)
 
@@ -68,8 +68,8 @@ class TestOrderBook:
 
     def test_get_all_buy_orders(self):
         order_book = OrderBook()
-        buy_order_1 = Mock(order_type=OrderType.BUY)
-        buy_order_2 = Mock(order_type=OrderType.BUY)
+        buy_order_1 = Mock(order_side=OrderSide.BUY)
+        buy_order_2 = Mock(order_side=OrderSide.BUY)
 
         order_book.add_order(buy_order_1)
         order_book.add_order(buy_order_2)
@@ -82,8 +82,8 @@ class TestOrderBook:
 
     def test_get_all_sell_orders(self):
         order_book = OrderBook()
-        sell_order_1 = Mock(order_type=OrderType.SELL)
-        sell_order_2 = Mock(order_type=OrderType.SELL)
+        sell_order_1 = Mock(order_side=OrderSide.SELL)
+        sell_order_2 = Mock(order_side=OrderSide.SELL)
 
         order_book.add_order(sell_order_1)
         order_book.add_order(sell_order_2)

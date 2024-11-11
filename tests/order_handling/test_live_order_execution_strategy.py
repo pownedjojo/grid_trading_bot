@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock
 from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
-from core.order_handling.order import OrderType
+from core.order_handling.order import OrderType, OrderSide
 from core.services.exchange_interface import ExchangeInterface
 from core.order_handling.exceptions import OrderExecutionFailedError
 
@@ -15,18 +15,18 @@ class TestLiveOrderExecutionStrategy:
         return LiveOrderExecutionStrategy(exchange_service=mock_exchange_service)
 
     @pytest.mark.asyncio
-    async def test_execute_order_full_fill_first_attempt(self, strategy, mock_exchange_service):
+    async def test_execute_market_order_full_fill_first_attempt(self, strategy, mock_exchange_service):
         mock_order = {'status': 'filled', 'id': 'order123', 'filled': 1.5}
         mock_exchange_service.place_order.return_value = mock_order
 
-        result = await strategy.execute_order(OrderType.BUY, "BTC/USD", 1.5, 50000)
+        result = await strategy.execute_market_order(OrderSide.BUY, "BTC/USD", 1.5, 50000)
 
         assert result['status'] == 'filled'
         assert result['id'] == 'order123'
         mock_exchange_service.place_order.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_execute_order_partial_fill_retry(self, strategy, mock_exchange_service):
+    async def test_execute_market_order_partial_fill_retry(self, strategy, mock_exchange_service):
         # Mock the exchange service to return a partially filled order on the first attempt
         partial_order = {'status': 'partially_filled', 'id': 'order123', 'filled_qty': 0.5, 'remaining_qty': 1.0}
         mock_exchange_service.place_order.return_value = partial_order
@@ -35,7 +35,7 @@ class TestLiveOrderExecutionStrategy:
         # Mock a full fill after retrying
         mock_exchange_service.place_order.side_effect = [partial_order, {'status': 'filled', 'id': 'order123', 'filled': 1.5}]
 
-        result = await strategy.execute_order(OrderType.BUY, "BTC/USD", 1.5, 50000)
+        result = await strategy.execute_market_order(OrderSide.BUY, "BTC/USD", 1.5, 50000)
 
         assert result['status'] == 'filled'
         assert result['id'] == 'order123'
@@ -43,12 +43,12 @@ class TestLiveOrderExecutionStrategy:
         assert mock_exchange_service.cancel_order.await_count == 1, "Expected a cancellation attempt for the partial fill"
     
     @pytest.mark.asyncio
-    async def test_execute_order_all_retries_failed(self, strategy, mock_exchange_service):
+    async def test_execute_market_order_all_retries_failed(self, strategy, mock_exchange_service):
         # Simulate order placement failure for all retries
         mock_exchange_service.place_order.side_effect = Exception("Order failed")
 
-        with pytest.raises(OrderExecutionFailedError, match="Failed to execute limit order after maximum retries"):
-            await strategy.execute_order(OrderType.BUY, "BTC/USD", 1.5, 50000)
+        with pytest.raises(OrderExecutionFailedError, match="Failed to execute Market order after maximum retries"):
+            await strategy.execute_market_order(OrderSide.BUY, "BTC/USD", 1.5, 50000)
 
         # Verify that place_order was called `max_retries` times
         assert mock_exchange_service.place_order.await_count == strategy.max_retries
@@ -65,8 +65,8 @@ class TestLiveOrderExecutionStrategy:
     @pytest.mark.asyncio
     async def test_adjust_price_sell(self, strategy):
         original_price = 100.0
-        adjusted_price_first_attempt = await strategy._adjust_price(OrderType.SELL, original_price, attempt=1)
-        adjusted_price_second_attempt = await strategy._adjust_price(OrderType.SELL, original_price, attempt=2)
+        adjusted_price_first_attempt = await strategy._adjust_price(OrderSide.SELL, original_price, attempt=1)
+        adjusted_price_second_attempt = await strategy._adjust_price(OrderSide.SELL, original_price, attempt=2)
 
         assert adjusted_price_first_attempt < original_price, "Adjusted price should be lower for SELL orders on the first attempt"
         assert adjusted_price_second_attempt < adjusted_price_first_attempt, "Adjusted price should decrease further on the second attempt"
@@ -74,8 +74,8 @@ class TestLiveOrderExecutionStrategy:
     @pytest.mark.asyncio
     async def test_adjust_price_buy(self, strategy):
         original_price = 100.0
-        adjusted_price_first_attempt = await strategy._adjust_price(OrderType.BUY, original_price, attempt=1)
-        adjusted_price_second_attempt = await strategy._adjust_price(OrderType.BUY, original_price, attempt=2)
+        adjusted_price_first_attempt = await strategy._adjust_price(OrderSide.BUY, original_price, attempt=1)
+        adjusted_price_second_attempt = await strategy._adjust_price(OrderSide.BUY, original_price, attempt=2)
 
         assert adjusted_price_first_attempt > original_price, "Adjusted price should be higher for BUY orders on the first attempt"
         assert adjusted_price_second_attempt > adjusted_price_first_attempt, "Adjusted price should increase further on the second attempt"

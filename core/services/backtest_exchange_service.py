@@ -160,29 +160,29 @@ class BacktestExchangeService(ExchangeInterface):
         amount: float, 
         price: Optional[float] = None
     ) -> Dict[str, Union[str, float]]:
-        raise NotImplementedError("place_order is not used in backtesting.")
+        raise NotImplementedError("place_order is not used in backtesting")
 
     async def get_balance(self) -> Dict[str, Any]:
-        raise NotImplementedError("get_balance is not used in backtesting.")
+        raise NotImplementedError("get_balance is not used in backtesting")
 
     async def get_current_price(
         self, 
         pair: str
     ) -> float:
-        raise NotImplementedError("get_current_price is not used in backtesting.")
+        raise NotImplementedError("get_current_price is not used in backtesting")
 
     async def get_order_status(
         self, 
         order_id: str
     ) -> Dict[str, Union[str, float]]:
-        raise NotImplementedError("get_order_status is not used in backtesting.")
+        raise NotImplementedError("get_order_status is not used in backtesting")
 
     async def cancel_order(
         self, 
         order_id: str, 
         pair: str
     ) -> Dict[str, Union[str, float]]:
-        raise NotImplementedError("cancel_order is not used in backtesting.")
+        raise NotImplementedError("cancel_order is not used in backtesting")
 
     async def get_exchange_status(self) -> dict:
-        raise NotImplementedError("get_exchange_status is not used in backtesting.")
+        raise NotImplementedError("get_exchange_status is not used in backtesting")

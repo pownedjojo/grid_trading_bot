@@ -34,7 +34,7 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
             'price': price,
             'pair': pair, 
             'side': order_side.name, 
-            'type': OrderType.MARKET, 
+            'type': OrderType.LIMIT, 
             'filled_qty': quantity, 
             'status': 'filled'
         }

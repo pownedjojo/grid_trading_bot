@@ -1,4 +1,4 @@
-import pytest
+import pytest, os
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from config.config_manager import ConfigManager
 from core.bot_management.grid_trading_bot import GridTradingBot
@@ -22,6 +22,7 @@ class TestGridTradingBot:
     def notification_handler(self):
         return Mock()
 
+    @patch.dict(os.environ, {"EXCHANGE_API_KEY": "test_api_key", "EXCHANGE_SECRET_KEY": "test_secret_key"})
     @pytest.fixture
     def bot(self, config_manager, notification_handler):
         return GridTradingBot(

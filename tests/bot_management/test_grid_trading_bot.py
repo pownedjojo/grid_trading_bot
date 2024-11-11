@@ -2,9 +2,11 @@ import pytest, os
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from config.config_manager import ConfigManager
 from core.bot_management.grid_trading_bot import GridTradingBot
+from core.bot_management.notification.notification_handler import NotificationHandler
 from core.services.exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 from config.trading_mode import TradingMode
 
+@patch.dict(os.environ, {"EXCHANGE_API_KEY": "test_api_key", "EXCHANGE_SECRET_KEY": "test_secret_key"})
 class TestGridTradingBot:
     @pytest.fixture
     def config_manager(self):
@@ -20,9 +22,8 @@ class TestGridTradingBot:
 
     @pytest.fixture
     def notification_handler(self):
-        return Mock()
+        return Mock(spec=NotificationHandler)
 
-    @patch.dict(os.environ, {"EXCHANGE_API_KEY": "test_api_key", "EXCHANGE_SECRET_KEY": "test_secret_key"})
     @pytest.fixture
     def bot(self, config_manager, notification_handler):
         return GridTradingBot(

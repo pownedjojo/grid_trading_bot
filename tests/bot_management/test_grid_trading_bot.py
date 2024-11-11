@@ -55,7 +55,7 @@ class TestGridTradingBot:
         bot.strategy._running = True
         bot.exchange_service.get_exchange_status = AsyncMock(return_value={"status": "ok"})
 
-        health_status = await bot.is_healthy()
+        health_status = await bot.get_bot_health_status()
 
         assert health_status["strategy"] is True
         assert health_status["exchange_status"] == "ok"
@@ -67,7 +67,7 @@ class TestGridTradingBot:
         bot.strategy._running = False
         bot.exchange_service.get_exchange_status = AsyncMock(return_value={"status": "ok"})
 
-        health_status = await bot.is_healthy()
+        health_status = await bot.get_bot_health_status()
 
         assert health_status["strategy"] is False
         assert health_status["exchange_status"] == "ok"

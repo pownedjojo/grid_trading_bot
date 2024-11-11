@@ -100,7 +100,7 @@ class GridTradingBot:
         self.logger.error(f"{type(exception).__name__}: {exception}")
         exit(1)
     
-    async def is_healthy(self) -> dict:
+    async def get_bot_health_status(self) -> dict:
         health_status = {
             "strategy": await self._check_strategy_health(),
             "exchange_status": await self._get_exchange_status()

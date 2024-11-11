@@ -8,26 +8,31 @@ class HealthCheck:
         self, 
         bot: GridTradingBot, 
         notification_handler: NotificationHandler,
+        stop_event: asyncio.Event,
         check_interval: int = 60
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.bot = bot
         self.notification_handler = notification_handler
+        self.stop_event = stop_event
         self.check_interval = check_interval
-        self.stop_event = asyncio.Event()
-
+    
     async def start(self):
         while not self.stop_event.is_set():
             await self._perform_checks()
-            await asyncio.sleep(self.check_interval)
+            try:
+                await asyncio.wait_for(self.stop_event.wait(), timeout=self.check_interval)
+            except asyncio.TimeoutError:
+                print("timeout")
+                continue
 
     async def _perform_checks(self):
         try:
-            bot_health = await self.bot.is_healthy()
+            bot_health = await self.bot.get_bot_health_status()
             await self._check_and_alert_bot_health(bot_health)
 
-            resource_usage = self._check_resource_usage()            
-            await self._check_and_alert_resource_usage(resource_usage)
+            ressource_usage = self._check_ressource_usage()            
+            await self._check_and_alert_ressource_usage(ressource_usage)
 
         except Exception as e:
             self.logger.error(f"Health check encountered an error: {e}")
@@ -44,7 +49,7 @@ class HealthCheck:
         if alerts:
             await self._send_alert(" | ".join(alerts))
 
-    async def _check_and_alert_resource_usage(self, usage: dict):
+    async def _check_and_alert_ressource_usage(self, usage: dict):
         alerts = []
 
         for resource, threshold in RESSOURCE_THRESHOLDS.items():
@@ -56,14 +61,7 @@ class HealthCheck:
         if alerts:
             await self._send_alert(" | ".join(alerts))
 
-    async def _check_bot_status(self) -> bool:
-        try:
-            return await self.bot.is_healthy()
-        except Exception as e:
-            self.logger.error(f"Bot status check failed: {e}")
-            return False
-
-    def _check_resource_usage(self) -> dict:
+    def _check_ressource_usage(self) -> dict:
         usage = {
             "cpu": psutil.cpu_percent(),
             "memory": psutil.virtual_memory().percent,
@@ -76,6 +74,3 @@ class HealthCheck:
 
     async def _send_alert(self, message: str):
         await self.notification_handler.async_send_notification("Health Check Alert", message=message)
-
-    async def stop(self):
-        self.stop_event.set()

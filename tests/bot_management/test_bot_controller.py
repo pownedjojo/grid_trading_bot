@@ -1,4 +1,4 @@
-import pytest
+import pytest, asyncio
 from unittest.mock import Mock, patch, AsyncMock
 from strategies.grid_trading_strategy import GridTradingStrategy
 from core.order_handling.balance_tracker import BalanceTracker
@@ -13,7 +13,8 @@ class TestBotController:
         strategy = Mock(spec=GridTradingStrategy)
         balance_tracker = Mock(spec=BalanceTracker)
         trading_performance_analyzer = Mock(spec=TradingPerformanceAnalyzer)
-        bot_controller = BotController(strategy, balance_tracker, trading_performance_analyzer)
+        stop_event = asyncio.Event()
+        bot_controller = BotController(strategy, balance_tracker, trading_performance_analyzer, stop_event)
         return bot_controller, strategy, balance_tracker, trading_performance_analyzer
 
     @patch("builtins.input", side_effect=["quit"])

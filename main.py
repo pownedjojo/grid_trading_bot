@@ -33,12 +33,13 @@ async def run_bot(
     save_performance_results_path: Optional[str] = None, 
     no_plot: bool = False
 ) -> Optional[Dict[str, Any]]:
+    stop_event = asyncio.Event()
     config_manager = initialize_config(config_path)
     setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_filename())
     notification_handler = initialize_notification_handler(config_manager)
     bot = GridTradingBot(config_path, config_manager, notification_handler, save_performance_results_path, no_plot)
-    bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.trading_performance_analyzer)
-    health_check = HealthCheck(bot, notification_handler)
+    bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.trading_performance_analyzer, stop_event)
+    health_check = HealthCheck(bot, notification_handler, stop_event)
 
     if profile:
         cProfile.runctx("asyncio.run(bot.run())", globals(), locals(), "profile_results.prof")

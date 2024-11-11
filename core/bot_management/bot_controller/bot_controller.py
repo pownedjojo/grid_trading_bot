@@ -10,12 +10,14 @@ class BotController:
         self, 
         strategy: GridTradingStrategy, 
         balance_tracker: BalanceTracker, 
-        trading_performance_analyzer: TradingPerformanceAnalyzer
+        trading_performance_analyzer: TradingPerformanceAnalyzer, 
+        stop_event: asyncio.Event
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.strategy = strategy
         self.balance_tracker = balance_tracker
         self.trading_performance_analyzer = trading_performance_analyzer
+        self.stop_event = stop_event
         self._stop_listener = False
 
     async def command_listener(self):
@@ -33,6 +35,8 @@ class BotController:
 
     async def _handle_command(self, command: str):
         if command == "quit":
+            self.logger.info("HealthCheck will be stopped.")
+            self.stop_event.set()
             await self.stop_listener()
             await self._shutdown_bot()
         

@@ -1,10 +1,15 @@
-import pytest
+import pytest, os
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 from config.config_manager import ConfigManager
 from core.bot_management.grid_trading_bot import GridTradingBot
 from core.bot_management.notification.notification_handler import NotificationHandler
 from core.services.exceptions import UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError
 from config.trading_mode import TradingMode
+
+@pytest.fixture(autouse=True)
+def mock_env_vars():
+    with patch.dict(os.environ, {"EXCHANGE_API_KEY": "test_api_key", "EXCHANGE_SECRET_KEY": "test_secret_key"}):
+        yield
 
 class TestGridTradingBot:
     @pytest.fixture
@@ -32,11 +37,6 @@ class TestGridTradingBot:
             save_performance_results_path="results.json",
             no_plot=True
         )
-    
-    @pytest.fixture
-    def setup_env_vars(self, monkeypatch):
-        monkeypatch.setenv("EXCHANGE_API_KEY", "test_api_key")
-        monkeypatch.setenv("EXCHANGE_SECRET_KEY", "test_secret_key")
 
     @patch("core.bot_management.grid_trading_bot.ExchangeServiceFactory.create_exchange_service", side_effect=UnsupportedExchangeError("Unsupported Exchange"))
     def test_initialization_with_unsupported_exchange_error(self, mock_exchange_service, config_manager, notification_handler):
@@ -56,7 +56,7 @@ class TestGridTradingBot:
 
     @patch("core.bot_management.grid_trading_bot.ExchangeServiceFactory.create_exchange_service")
     @pytest.mark.asyncio
-    async def test_is_healthy(self, mock_exchange_service, bot, setup_env_vars):
+    async def test_is_healthy(self, mock_exchange_service, bot):
         bot.strategy = Mock()
         bot.strategy._running = True
         bot.exchange_service.get_exchange_status = AsyncMock(return_value={"status": "ok"})
@@ -68,7 +68,7 @@ class TestGridTradingBot:
         assert health_status["overall"] is True
 
     @pytest.mark.asyncio
-    async def test_is_healthy_strategy_stopped(self, bot, setup_env_vars):
+    async def test_is_healthy_strategy_stopped(self, bot):
         bot.strategy = Mock()
         bot.strategy._running = False
         bot.exchange_service.get_exchange_status = AsyncMock(return_value={"status": "ok"})
@@ -81,7 +81,7 @@ class TestGridTradingBot:
 
     @patch("core.bot_management.grid_trading_bot.GridTradingBot._generate_and_log_performance")
     @pytest.mark.asyncio
-    async def test_generate_and_log_performance_direct(self, mock_performance, bot, setup_env_vars):
+    async def test_generate_and_log_performance_direct(self, mock_performance, bot):
         mock_performance.return_value = {
             "config": bot.config_path,
             "performance_summary": {"profit": 100},
@@ -98,7 +98,7 @@ class TestGridTradingBot:
 
     @patch("core.bot_management.grid_trading_bot.GridTradingStrategy", new_callable=MagicMock)
     @pytest.mark.asyncio
-    async def test_check_strategy_health(self, mock_strategy, bot, setup_env_vars):
+    async def test_check_strategy_health(self, mock_strategy, bot):
         bot.strategy = mock_strategy
 
         mock_strategy._running = True
@@ -110,7 +110,7 @@ class TestGridTradingBot:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_get_exchange_status(self, bot, setup_env_vars):
+    async def test_get_exchange_status(self, bot):
         bot.exchange_service = MagicMock()
         bot.exchange_service.get_exchange_status = AsyncMock(return_value={"status": "ok"})
 

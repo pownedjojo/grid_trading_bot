@@ -16,4 +16,5 @@ dependencies:
     - apprise
     - ccxt
     - configparser
+    - psutil
     - python-dotenv

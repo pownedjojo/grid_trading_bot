@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: "conda"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "numpy"
+      - dependency-name: "pandas"
+    labels:
+        - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      labels:
+        - "actions"

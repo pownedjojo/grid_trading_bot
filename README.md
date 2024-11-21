@@ -60,7 +60,7 @@ Ensure you have [Conda](https://docs.conda.io/projects/conda/en/latest/user-guid
 
 1. **Clone the repository**:
   ```sh
-  git clone https://github.com/yourusername/grid_trading_bot.git
+  git clone https://github.com/jordantete/grid_trading_bot.git
   cd grid_trading_bot
   ```
 

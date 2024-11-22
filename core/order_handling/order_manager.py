@@ -7,6 +7,7 @@ from ..order_handling.order_book import OrderBook
 from ..grid_management.grid_manager import GridManager
 from ..grid_management.grid_level import GridLevel
 from ..validation.transaction_validator import TransactionValidator
+from core.bot_management.event_bus import EventBus
 from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 from .execution_strategy.order_execution_strategy import OrderExecutionStrategy
 from core.bot_management.notification.notification_handler import NotificationHandler
@@ -21,6 +22,7 @@ class OrderManager:
         transaction_validator: TransactionValidator, 
         balance_tracker: BalanceTracker, 
         order_book: OrderBook,
+        event_bus: EventBus,
         order_execution_strategy: OrderExecutionStrategy,
         notification_handler: NotificationHandler
     ):
@@ -30,6 +32,7 @@ class OrderManager:
         self.transaction_validator = transaction_validator
         self.balance_tracker = balance_tracker
         self.order_book = order_book
+        self.event_bus = event_bus
         self.order_execution_strategy = order_execution_strategy
         self.notification_handler = notification_handler
         self.finalize_order_placement_lock = asyncio.Lock()

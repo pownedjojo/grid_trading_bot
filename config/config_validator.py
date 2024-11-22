@@ -1,6 +1,8 @@
 import logging
 from .trading_mode import TradingMode
 from .exceptions import ConfigValidationError
+from strategies.strategy_type import StrategyType
+from strategies.spacing_type import SpacingType
 
 class ConfigValidator:
     def __init__(self):
@@ -102,29 +104,53 @@ class ConfigValidator:
         missing_fields = []
         invalid_fields = []
         grid = config.get('grid_strategy', {})
-        
-        if grid.get('type') is None:
+
+        grid_type = grid.get('type')
+        if grid_type is None:
             missing_fields.append('grid_strategy.type')
+        else:
+            try:
+                StrategyType.from_string(grid_type)
 
-        if grid.get('type') not in ['arithmetic', 'geometric']:
-            self.logger.error("Grid type must be either 'arithmetic' or 'geometric'.")
-            invalid_fields.append('grid_strategy.type')
+            except ValueError as e:
+                self.logger.error(str(e))
+                invalid_fields.append('grid_strategy.type')
+        
+        spacing = grid.get('spacing')
+        if spacing is None:
+            missing_fields.append('grid_strategy.spacing')
+        else:
+            try:
+                SpacingType.from_string(spacing)
 
-        if grid.get('num_grids') is None:
+            except ValueError as e:
+                self.logger.error(str(e))
+                invalid_fields.append('grid_strategy.spacing')
+
+        num_grids = grid.get('num_grids')
+        if num_grids is None:
             missing_fields.append('grid_strategy.num_grids')
+        elif not isinstance(num_grids, int) or num_grids <= 0:
+            self.logger.error("Grid strategy 'num_grids' must be a positive integer.")
+            invalid_fields.append('grid_strategy.num_grids')
 
         range_ = grid.get('range', {})
-        if range_.get('top') is None:
+        top = range_.get('top')
+        bottom = range_.get('bottom')
+        if top is None:
             missing_fields.append('grid_strategy.range.top')
-        if range_.get('bottom') is None:
+        if bottom is None:
             missing_fields.append('grid_strategy.range.bottom')
-        
-        top = grid.get('range', {}).get('top')
-        bottom = grid.get('range', {}).get('bottom')
-        if top is not None and bottom is not None and bottom >= top:
-            self.logger.error("Bottom range must be less than top range.")
-            invalid_fields.append('grid_strategy.range.top')
-            invalid_fields.append('grid_strategy.range.bottom')
+
+        if top is not None and bottom is not None:
+            if not isinstance(top, (int, float)) or not isinstance(bottom, (int, float)):
+                self.logger.error("'top' and 'bottom' in 'grid_strategy.range' must be numbers.")
+                invalid_fields.append('grid_strategy.range.top')
+                invalid_fields.append('grid_strategy.range.bottom')
+            elif bottom >= top:
+                self.logger.error("'grid_strategy.range.bottom' must be less than 'grid_strategy.range.top'.")
+                invalid_fields.append('grid_strategy.range.top')
+                invalid_fields.append('grid_strategy.range.bottom')
 
         return missing_fields, invalid_fields
 

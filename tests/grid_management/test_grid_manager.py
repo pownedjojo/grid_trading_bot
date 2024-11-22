@@ -13,7 +13,7 @@ class TestGridManager:
         mock_config_manager.get_bottom_range.return_value = 1000
         mock_config_manager.get_top_range.return_value = 2000
         mock_config_manager.get_num_grids.return_value = 10
-        mock_config_manager.get_grid_type.return_value = 'arithmetic'
+        mock_config_manager.get_spacing_type.return_value = 'arithmetic'
         return mock_config_manager
 
     @pytest.fixture
@@ -48,7 +48,7 @@ class TestGridManager:
         assert central_price == 1500
 
     def test_calculate_price_grids_and_central_price_geometric(self, config_manager):
-        config_manager.get_grid_type.return_value = 'geometric'
+        config_manager.get_spacing_type.return_value = 'geometric'
         config_manager.get_top_range.return_value = 2000
         config_manager.get_bottom_range.return_value = 1000
         grid_manager = GridManager(config_manager)

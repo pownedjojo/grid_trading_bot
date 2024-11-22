@@ -18,7 +18,7 @@ class TestGridTradingBot:
         mock_config.get_trading_mode.return_value = TradingMode.LIVE
         mock_config.get_initial_balance.return_value = 1000
         mock_config.get_exchange_name.return_value = "binance"
-        mock_config.get_grid_type.return_value = "arithmetic"
+        mock_config.get_spacing_type.return_value = "arithmetic"
         mock_config.get_top_range.return_value = 2000
         mock_config.get_bottom_range.return_value = 1500
         mock_config.get_num_grids.return_value = 10

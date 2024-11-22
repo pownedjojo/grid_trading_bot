@@ -17,7 +17,8 @@
     "initial_balance": 60
   },
   "grid_strategy": {
-    "type": "geometric",
+    "type": "hedged_grid",
+    "spacing": "geometric",
     "num_grids": 10,
     "range": {
       "top": 200,

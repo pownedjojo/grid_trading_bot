@@ -1,5 +1,6 @@
 import json, os, logging
 from typing import Optional
+from strategies.strategy_type import StrategyType
 from .trading_mode import TradingMode
 from .exceptions import ConfigFileNotFoundError, ConfigParseError
 
@@ -88,10 +89,18 @@ class ConfigManager:
     # --- Grid Accessor Methods ---
     def get_grid_settings(self):
         return self.config.get('grid_strategy', {})
-    
-    def get_grid_type(self):
+
+    def get_strategy_type(self) -> Optional[StrategyType]:
         grid_settings = self.get_grid_settings()
-        return grid_settings.get('type', None)
+        strategy_type = grid_settings.get('type', None)
+
+        if strategy_type:
+            return StrategyType.from_string(strategy_type)
+        return None
+    
+    def get_spacing_type(self):
+        grid_settings = self.get_grid_settings()
+        return grid_settings.get('spacing', None)
 
     def get_num_grids(self):
         grid_settings = self.get_grid_settings()

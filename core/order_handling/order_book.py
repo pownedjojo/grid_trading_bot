@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Tuple
-from .order import Order, OrderSide
+from .order import Order, OrderSide, OrderState
 from ..grid_management.grid_level import GridLevel
 
 class OrderBook:
@@ -38,3 +38,19 @@ class OrderBook:
 
     def get_all_sell_orders(self) -> List[Order]:
         return self.sell_orders
+    
+    def get_pending_orders(self) -> List[Order]:
+        return [order for order in self.buy_orders + self.sell_orders if order.is_pending()]
+
+    def get_completed_orders(self) -> List[Order]:
+        return [order for order in self.buy_orders + self.sell_orders if order.is_completed()]
+
+    def update_order_state(
+        self, 
+        order_id: str, 
+        new_state: OrderState
+    ) -> None:
+        for order in self.buy_orders + self.sell_orders:
+            if order.identifier == order_id:
+                order.state = new_state
+                break

@@ -95,7 +95,7 @@ class TradingPerformanceAnalyzer:
         for sell_order, grid_level in sell_orders_with_grid:
             orders.append(self._format_order(sell_order, grid_level))
         
-        orders.sort(key=lambda x: (x[3] is None, x[3]))  # x[3] is the timestamp, sort None to the end
+        orders.sort(key=lambda x: (x[4] is None, x[4]))  # x[4] is the timestamp, sort None to the end
         return orders
     
     def _format_order(self, order: Order, grid_level: Optional[GridLevel]) -> List[Union[str, float]]:

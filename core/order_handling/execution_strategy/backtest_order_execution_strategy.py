@@ -38,3 +38,12 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
             'filled_qty': quantity, 
             'status': 'filled'
         }
+    
+    async def get_order(
+        self, 
+        order_id: str
+    ) -> dict:
+        return {
+            'id': order_id, 
+            'status': "filled"
+        }

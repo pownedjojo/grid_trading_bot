@@ -21,3 +21,10 @@ class OrderExecutionStrategy(ABC):
         price: float
     ) -> dict:
         pass
+
+    @abstractmethod
+    async def get_order(
+        self, 
+        order_id: str
+    ) -> dict:
+        pass

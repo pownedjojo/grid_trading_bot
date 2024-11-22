@@ -2,6 +2,7 @@ import logging
 from typing import List, Optional, Tuple
 import numpy as np
 from strategies.strategy_type import StrategyType
+from strategies.spacing_type import SpacingType
 from .grid_level import GridLevel, GridCycleState
 
 class GridManager:
@@ -85,11 +86,23 @@ class GridManager:
         return bottom_range, top_range, num_grids, spacing_type
 
     def _calculate_price_grids_and_central_price(self) -> Tuple[List[float], float]:
+        """
+        Calculates price grids and the central price based on the configuration.
+
+        Returns:
+            Tuple[List[float], float]: A tuple containing:
+                - grids (List[float]): The list of calculated grid prices.
+                - central_price (float): The central price of the grid.
+
+        Raises:
+            ValueError: If inputs are invalid or grid calculation fails.
+        """
         bottom_range, top_range, num_grids, spacing_type = self._extract_grid_config()
-        if spacing_type == 'arithmetic':
+        
+        if spacing_type == SpacingType.ARITHMETIC:
             grids = np.linspace(bottom_range, top_range, num_grids)
             central_price = (top_range + bottom_range) / 2
-        elif spacing_type == 'geometric':
+        elif spacing_type == SpacingType.GEOMETRIC:
             grids = []
             ratio = (top_range / bottom_range) ** (1 / (num_grids - 1))
             current_price = bottom_range

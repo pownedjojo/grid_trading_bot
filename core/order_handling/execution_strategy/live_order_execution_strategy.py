@@ -29,8 +29,8 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     ) -> dict:
         for attempt in range(self.max_retries):
             try:
-                order = await self.exchange_service.place_order(pair, OrderType.MARKET.value.lower(), order_side.name.lower(), quantity, price)
-                order_result = await self._normalize_order_result(order)
+                raw_order = await self.exchange_service.place_order(pair, OrderType.MARKET.value.lower(), order_side.name.lower(), quantity, price)
+                order_result = await self._parse_order_result(raw_order)
                 
                 if order_result['status'] == 'filled':
                     return order_result  # Order fully filled
@@ -55,8 +55,8 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
         price: float
     ) -> dict:
         try:
-            order = await self.exchange_service.place_order(pair, OrderType.LIMIT.value.lower(), order_side.name.lower(), quantity, price)
-            order_result = await self._normalize_order_result(order)
+            raw_order = await self.exchange_service.place_order(pair, OrderType.LIMIT.value.lower(), order_side.name.lower(), quantity, price)
+            order_result = await self._parse_order_result(raw_order)
             return order_result
         
         except DataFetchError as e:
@@ -67,7 +67,22 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
             self.logger.error(f"Unexpected error in execute_limit_order: {e}")
             raise OrderExecutionFailedError(f"Unexpected error during order execution: {e}", order_side, OrderType.LIMIT, pair, quantity, price)
 
-    async def _normalize_order_result(
+    async def get_order(
+        self, 
+        order_id: str
+    ) -> dict:
+        try:
+            raw_order = await self.exchange_service.fetch_order(order_id)
+            order_result = await self._parse_order_result(raw_order)
+            return order_result
+
+        except DataFetchError as e:
+            raise e
+
+        except Exception as e:
+            raise DataFetchError(f"Unexpected error during order status retrieval: {str(e)}")
+
+    async def _parse_order_result(
         self, 
         raw_order_result: dict
     ) -> dict:

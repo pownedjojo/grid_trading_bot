@@ -38,47 +38,70 @@ class OrderStatusTracker:
         """
         try:
             while True:
-                self._process_pending_orders()
+                await self._process_pending_orders()
                 await asyncio.sleep(self.polling_interval)
+
         except asyncio.CancelledError:
             self.logger.info("OrderStatusTracker monitoring task was cancelled.")
-        except Exception as error:
-            self.logger.exception(f"Unexpected error in OrderStatusTracker: {error}")
 
-    def _process_pending_orders(self) -> None:
+        except Exception as error:
+            self.logger.error(f"Unexpected error in OrderStatusTracker: {error}")
+
+    async def _process_pending_orders(self) -> None:
         """
         Processes pending orders by querying their statuses and handling state changes.
         """
         pending_orders = self.order_book.get_pending_orders()
         for order in pending_orders:
             try:
-                order_status = self.order_execution_strategy.get_order_status(order.identifier)
+                order_status = await self.order_execution_strategy.get_order(order.identifier)
                 self._handle_order_status_change(order, order_status)
+
             except Exception as error:
-                self.logger.error(
-                    f"Failed to query status for order {order.identifier}: {error}"
-                )
+                self.logger.error(f"Failed to query status for order {order.identifier}: {error}")
 
     def _handle_order_status_change(
         self,
-        order: Order,
-        order_status: str,
+        local_order: Order,
+        remote_order_data: dict,
     ) -> None:
         """
-        Handles changes in order statuses and publishes relevant events.
+        Handles changes in the status of an order by comparing the local order state 
+        with the latest data fetched from the exchange.
 
         Args:
-            order: The Order instance being tracked.
-            order_status: The new status of the order.
+            local_order: The local `Order` object being tracked.
+            remote_order_data: The latest order data fetched from the exchange as a dictionary.
+
+        Raises:
+            ValueError: If critical fields are missing from the `remote_order_data`.
         """
-        if order_status == "filled":
-            self.order_book.update_order_state(order.identifier, OrderState.COMPLETED)
-            self.event_bus.publish_sync(Events.ORDER_COMPLETED, order)
-            self.logger.info(f"Order {order.identifier} completed.")
-        elif order_status == "canceled":
-            self.order_book.update_order_state(order.identifier, OrderState.CANCELLED)
-            self.event_bus.publish_sync(Events.ORDER_CANCELLED, order)
-            self.logger.warning(f"Order {order.identifier} was canceled.")
+        remote_order_status = remote_order_data.get("status")
+        filled = remote_order_data.get("filled_qty", 0.0)
+        remaining = remote_order_data.get("remaining_qty", 0.0)
+
+        if remote_order_status == "unknown":
+            self.logger.error(f"Missing 'status' in remote order data: {remote_order_data}")
+            raise ValueError("Order data from the exchange is missing the 'status' field.")
+
+        if remote_order_status == "filled":
+            self.order_book.update_order_state(local_order.identifier, OrderState.COMPLETED)
+            self.event_bus.publish_sync(Events.ORDER_COMPLETED, local_order)
+            self.logger.info(f"Order {local_order.identifier} completed.")
+
+        elif remote_order_status == "canceled":
+            self.order_book.update_order_state(local_order.identifier, OrderState.CANCELLED)
+            self.event_bus.publish_sync(Events.ORDER_CANCELLED, local_order)
+            self.logger.warning(f"Order {local_order.identifier} was canceled.")
+
+        elif remote_order_status == "open":
+            if filled > 0:
+                self.logger.info(f"Order {local_order.identifier} partially filled. Filled: {filled}, Remaining: {remaining}.")
+            else:
+                self.logger.debug(f"Order {local_order.identifier} is still open. No fills yet.")
+
+        else:
+            self.logger.warning(f"Unhandled order status '{remote_order_status}' for order {local_order.identifier}.")
 
     def start_tracking(self) -> None:
         """

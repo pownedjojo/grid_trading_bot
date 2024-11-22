@@ -1,4 +1,4 @@
-import logging, asyncio
+import logging, asyncio, inspect
 from typing import Callable, Dict, List, Any, Awaitable, Union
 
 class Events:
@@ -26,11 +26,19 @@ class EventBus:
     def subscribe(self, event_type: str, callback: Union[Callable[[Any], None], Callable[[Any], Awaitable[None]]]) -> None:
         """
         Subscribes a callback to a specific event type.
+
+        Args:
+            event_type: The type of event to subscribe to.
+            callback: The callback function to invoke when the event is published.
         """
         if event_type not in self.subscribers:
             self.subscribers[event_type] = []
+
         self.subscribers[event_type].append(callback)
-        self.logger.info(f"Callback subscribed to event: {event_type}")
+        callback_name = getattr(callback, "__name__", str(callback))
+        caller_frame = inspect.stack()[1]
+        caller_name = f"{caller_frame.function} (from {caller_frame.filename}:{caller_frame.lineno})"
+        self.logger.info(f"Callback '{callback_name}' subscribed to event: {event_type} by {caller_name}")
 
     def unsubscribe(self, event_type: str, callback: Callable[[Any], None]) -> None:
         """

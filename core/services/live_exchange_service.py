@@ -140,13 +140,12 @@ class LiveExchangeService(ExchangeInterface):
         except Exception as e:
             raise DataFetchError(f"Unexpected error placing order: {str(e)}")
 
-    async def get_order_status(
+    async def fetch_order(
         self, 
         order_id: str
     ) -> Dict[str, Union[str, float]]:
         try:
-            order = await self.exchange.fetch_order(order_id)
-            return order
+            return await self.exchange.fetch_order(order_id)
 
         except ccxt.NetworkError as e:
             raise DataFetchError(f"Network issue occurred while fetching order status: {str(e)}")

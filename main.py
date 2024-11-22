@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from utils.arg_parser import parse_and_validate_console_args
 from utils.performance_results_saver import save_or_append_performance_results
 from core.bot_management.bot_controller.bot_controller import BotController
+from core.bot_management.event_bus import EventBus
 from config.trading_mode import TradingMode
 from core.bot_management.notification.notification_handler import NotificationHandler
 from core.bot_management.grid_trading_bot import GridTradingBot
@@ -33,26 +34,37 @@ async def run_bot(
     save_performance_results_path: Optional[str] = None, 
     no_plot: bool = False
 ) -> Optional[Dict[str, Any]]:
-    stop_event = asyncio.Event()
     config_manager = initialize_config(config_path)
     setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_filename())
+    event_bus = EventBus()
     notification_handler = initialize_notification_handler(config_manager)
-    bot = GridTradingBot(config_path, config_manager, notification_handler, save_performance_results_path, no_plot)
-    bot_controller = BotController(bot.strategy, bot.balance_tracker, bot.trading_performance_analyzer, stop_event)
-    health_check = HealthCheck(bot, notification_handler, stop_event)
-
+    bot = GridTradingBot(config_path, config_manager, notification_handler, event_bus, save_performance_results_path, no_plot)
+    bot_controller = BotController(bot, event_bus)
+    health_check = HealthCheck(bot, notification_handler, event_bus)
+    
     if profile:
         cProfile.runctx("asyncio.run(bot.run())", globals(), locals(), "profile_results.prof")
         return None
-    else:
+
+    try:
         if bot.trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}:
-            await asyncio.gather(
-                bot.run(), 
-                bot_controller.command_listener(),
-                health_check.start()
-            )
+            bot_task = asyncio.create_task(bot.run(), name="BotTask")
+            bot_controller_task = asyncio.create_task(bot_controller.command_listener(), name="BotControllerTask")
+            health_check_task = asyncio.create_task(health_check.start(), name="HealthCheckTask")
+            await asyncio.gather(bot_task, bot_controller_task, health_check_task)
         else:
             await bot.run()
+
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+    
+    finally:
+        logging.info("Shutting down bot...")
+        for task in asyncio.all_tasks():
+            if task is not asyncio.current_task():
+                task.cancel()
+        await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
+        logging.info("All tasks have been cleaned up.")
 
 if __name__ == "__main__":
     args = parse_and_validate_console_args()

@@ -5,6 +5,7 @@ import numpy as np
 from .base import TradingStrategy
 from config.trading_mode import TradingMode
 from core.order_handling.order import OrderSide
+from core.bot_management.event_bus import EventBus, Events
 from config.config_manager import ConfigManager
 from core.services.exchange_interface import ExchangeInterface
 from core.grid_management.grid_manager import GridManager
@@ -13,12 +14,13 @@ from core.order_handling.balance_tracker import BalanceTracker
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from strategies.plotter import Plotter
 
-TICKER_REFRESH_INTERVAL = 3  # in seconds
-
 class GridTradingStrategy(TradingStrategy):
+    TICKER_REFRESH_INTERVAL = 3  # in seconds
+
     def __init__(
         self,
         config_manager: ConfigManager,
+        event_bus: EventBus,
         exchange_service: ExchangeInterface,
         grid_manager: GridManager,
         order_manager: OrderManager,
@@ -28,6 +30,7 @@ class GridTradingStrategy(TradingStrategy):
     ):
         super().__init__(config_manager, balance_tracker)
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.event_bus = event_bus
         self.exchange_service = exchange_service
         self.grid_manager = grid_manager
         self.order_manager = order_manager
@@ -62,14 +65,16 @@ class GridTradingStrategy(TradingStrategy):
 
     async def restart(self):
         if not self._running:
-            self._running = True
             self.logger.info("Restarting trading session.")
             await self.run()
 
     async def run(self):
+        self._running = True
+
         if self.trading_mode == TradingMode.BACKTEST:
             await self._run_backtest()
             self.logger.info("Ending backtest simulation")
+            self._running = False
         else:
             await self._run_live_or_paper_trading()
     
@@ -90,11 +95,11 @@ class GridTradingStrategy(TradingStrategy):
 
             if await self._check_take_profit_stop_loss(current_price, timestamp):
                 self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
-                await self.stop()
+                await self.event_bus.publish(Events.STOP_BOT, "TP or SL hit.")
                 return
 
             last_price = current_price
-        await self.exchange_service.listen_to_ticker_updates(pair, on_ticker_update, TICKER_REFRESH_INTERVAL)
+        await self.exchange_service.listen_to_ticker_updates(pair, on_ticker_update, self.TICKER_REFRESH_INTERVAL)
 
     async def _run_backtest(self) -> None:
         if self.data is None:
@@ -164,3 +169,6 @@ class GridTradingStrategy(TradingStrategy):
             return True
 
         return False
+    
+    def get_formatted_orders(self):
+        return self.trading_performance_analyzer.get_formatted_orders()

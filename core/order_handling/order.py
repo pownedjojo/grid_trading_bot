@@ -27,6 +27,7 @@ class Order:
     ):
         if not isinstance(order_side, OrderSide):
             raise InvalidOrderSideError("Invalid order side")
+            
         if not isinstance(order_type, OrderType):
             raise InvalidOrderTypeError("Invalid order type")
 

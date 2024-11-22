@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional, Tuple
 import numpy as np
+from strategies.strategy_type import StrategyType
 from .grid_level import GridLevel, GridCycleState
 
 class GridManager:
@@ -8,6 +9,7 @@ class GridManager:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config_manager = config_manager
         self.initial_balance: float = self.config_manager.get_initial_balance()
+        self.strategy_type: StrategyType = self.config_manager.get_strategy_type()
         self.price_grids: List[float]
         self.central_price: float
         self.sorted_buy_grids: List[float]
@@ -16,9 +18,15 @@ class GridManager:
     
     def initialize_grids_and_levels(self) -> None:
         self.price_grids, self.central_price = self._calculate_price_grids_and_central_price()
-        self.sorted_buy_grids = [price_grid for price_grid in self.price_grids if price_grid <= self.central_price]
-        self.sorted_sell_grids = [price_grid for price_grid in self.price_grids if price_grid > self.central_price]
-        self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY if price <= self.central_price else GridCycleState.READY_TO_SELL) for price in self.price_grids}
+
+        if self.strategy_type == StrategyType.SIMPLE_GRID:
+            self.sorted_buy_grids = [price_grid for price_grid in self.price_grids if price_grid <= self.central_price]
+            self.sorted_sell_grids = [price_grid for price_grid in self.price_grids if price_grid > self.central_price]
+            self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY if price <= self.central_price else GridCycleState.READY_TO_SELL) for price in self.price_grids}
+        elif self.strategy_type == StrategyType.HEDGED_GRID:
+            self.sorted_buy_grids = self.price_grids[:-1]  # Buy from all except the top grid
+            self.sorted_sell_grids = self.price_grids[1:]  # Sell on all except the bottom grid
+            self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY_SELL) for price in self.price_grids}
     
     def get_crossed_grid_level(
         self, 
@@ -59,20 +67,29 @@ class GridManager:
         price: float
     ) -> Optional[GridLevel]:
         return self.grid_levels.get(price)
+    
+    def get_next_sell_grid(
+        self, 
+        buy_price: float
+    ) -> Optional[GridLevel]:
+        for sell_price in self.sorted_sell_grids:
+            if sell_price > buy_price:
+                return self._get_grid_level(sell_price)
+        return None
 
     def _extract_grid_config(self) -> Tuple[float, float, int, str]:
         bottom_range = self.config_manager.get_bottom_range()
         top_range = self.config_manager.get_top_range()
         num_grids = self.config_manager.get_num_grids()
-        grid_type = self.config_manager.get_grid_type()
-        return bottom_range, top_range, num_grids, grid_type
+        spacing_type = self.config_manager.get_spacing_type()
+        return bottom_range, top_range, num_grids, spacing_type
 
     def _calculate_price_grids_and_central_price(self) -> Tuple[List[float], float]:
-        bottom_range, top_range, num_grids, grid_type = self._extract_grid_config()
-        if grid_type == 'arithmetic':
+        bottom_range, top_range, num_grids, spacing_type = self._extract_grid_config()
+        if spacing_type == 'arithmetic':
             grids = np.linspace(bottom_range, top_range, num_grids)
             central_price = (top_range + bottom_range) / 2
-        elif grid_type == 'geometric':
+        elif spacing_type == 'geometric':
             grids = []
             ratio = (top_range / bottom_range) ** (1 / (num_grids - 1))
             current_price = bottom_range

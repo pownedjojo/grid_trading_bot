@@ -6,6 +6,7 @@ class GridCycleState(Enum):
     READY_TO_BUY = auto()
     READY_TO_SELL = auto()
     COMPLETED = auto()   
+    READY_TO_BUY_SELL = auto()  # For hedged grids
 
 class GridLevel:
     def __init__(self, price: float, cycle_state: GridCycleState):

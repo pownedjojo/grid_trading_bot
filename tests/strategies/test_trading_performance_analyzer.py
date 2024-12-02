@@ -80,7 +80,7 @@ class TestPerformanceAnalyzer:
 
         buy_order = Order(identifier="123", price=1000, quantity=1, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")
         sell_order = Order(identifier="321", price=1200, quantity=1, order_side= OrderSide.SELL, order_type=OrderType.MARKET, timestamp="2024-01-02T00:00:00Z")
-        grid_level = GridLevel(price=1000, cycle_state="active")
+        grid_level = GridLevel(price=1000, state="active")
 
         order_book.get_buy_orders_with_grid.return_value = [(buy_order, grid_level)]
         order_book.get_sell_orders_with_grid.return_value = [(sell_order, grid_level)]
@@ -122,7 +122,7 @@ class TestPerformanceAnalyzer:
 
         buy_order = Order(identifier="123", price=1000, quantity=1, order_side= OrderSide.BUY, order_type=OrderType.MARKET, timestamp="2024-01-01T00:00:00Z")
         sell_order = Order(identifier="321", price=1200, quantity=1, order_side= OrderSide.SELL, order_type=OrderType.MARKET, timestamp="2024-01-02T00:00:00Z")
-        grid_level = GridLevel(price=1000, cycle_state="completed")
+        grid_level = GridLevel(price=1000, state="completed")
 
         order_book.get_all_buy_orders.return_value = [buy_order]
         order_book.get_all_sell_orders.return_value = [sell_order]

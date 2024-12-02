@@ -14,7 +14,7 @@ class OrderStatusTracker:
         order_book: OrderBook,
         order_execution_strategy,
         event_bus: EventBus,
-        polling_interval: float = 5.0,
+        polling_interval: float = 10.0,
     ):
         """
         Initializes the OrderStatusTracker.

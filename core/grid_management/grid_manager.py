@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 from strategies.strategy_type import StrategyType
 from strategies.spacing_type import SpacingType
-from .grid_level import GridLevel, GridCycleState
+from .grid_level import GridLevel, GridLevelState
 
 class GridManager:
     def __init__(self, config_manager):
@@ -23,11 +23,11 @@ class GridManager:
         if self.strategy_type == StrategyType.SIMPLE_GRID:
             self.sorted_buy_grids = [price_grid for price_grid in self.price_grids if price_grid <= self.central_price]
             self.sorted_sell_grids = [price_grid for price_grid in self.price_grids if price_grid > self.central_price]
-            self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY if price <= self.central_price else GridCycleState.READY_TO_SELL) for price in self.price_grids}
+            self.grid_levels = {price: GridLevel(price, GridLevelState.READY_TO_BUY if price <= self.central_price else GridLevelState.READY_TO_SELL) for price in self.price_grids}
         elif self.strategy_type == StrategyType.HEDGED_GRID:
             self.sorted_buy_grids = self.price_grids[:-1]  # Buy from all except the top grid
             self.sorted_sell_grids = self.price_grids[1:]  # Sell on all except the bottom grid
-            self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY_SELL) for price in self.price_grids}
+            self.grid_levels = {price: GridLevel(price, GridLevelState.READY_TO_BUY_SELL) for price in self.price_grids}
     
     def get_crossed_grid_level(
         self, 

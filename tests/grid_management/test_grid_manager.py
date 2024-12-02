@@ -3,7 +3,7 @@ import numpy as np
 from unittest.mock import Mock
 from config.config_manager import ConfigManager
 from core.grid_management.grid_manager import GridManager
-from core.grid_management.grid_level import GridLevel, GridCycleState
+from core.grid_management.grid_level import GridLevel, GridLevelState
 
 class TestGridManager:
     @pytest.fixture
@@ -26,9 +26,9 @@ class TestGridManager:
         for price, grid_level in grid_manager.grid_levels.items():
             assert isinstance(grid_level, GridLevel)
             if price <= grid_manager.central_price:
-                assert grid_level.cycle_state == GridCycleState.READY_TO_BUY
+                assert grid_level.state == GridLevelState.READY_TO_BUY
             else:
-                assert grid_level.cycle_state == GridCycleState.READY_TO_SELL
+                assert grid_level.state == GridLevelState.READY_TO_SELL
 
     def test_get_grid_level(self, grid_manager):
         grid_manager.initialize_grids_and_levels()

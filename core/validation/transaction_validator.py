@@ -55,7 +55,7 @@ class TransactionValidator:
     ) -> None:
         if order_side == OrderSide.BUY:
             if not grid_level.can_place_buy_order():
-                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.cycle_state}")
+                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a buy order, current state: {grid_level.state}")
         else:  # SELL
             if not grid_level.can_place_sell_order():
-                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a sell order, current state: {grid_level.cycle_state}")
+                raise GridLevelNotReadyError(f"Grid level {grid_level.price} is not ready for a sell order, current state: {grid_level.state}")

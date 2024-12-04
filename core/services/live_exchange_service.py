@@ -56,7 +56,7 @@ class LiveExchangeService(ExchangeInterface):
     async def _subscribe_to_ticker_updates(
         self,
         pair: str, 
-        on_ticker_update: Callable[[float, float], None], 
+        on_ticker_update: Callable[[float], None], 
         update_interval: float = 1.0
     ) -> None:
         self.connection_active = True
@@ -64,14 +64,13 @@ class LiveExchangeService(ExchangeInterface):
         while self.connection_active:
             try:
                 ticker = await self.exchange.watch_ticker(pair)
-                current_price = ticker['last']
-                timestamp = ticker['timestamp'] / 1000.0  # Convert to seconds
+                current_price: float = ticker['last']
                 self.logger.info(f"Connected to WebSocket for {pair} ticker current price: {current_price}")
 
                 if not self.connection_active:
                     break
 
-                await on_ticker_update(current_price, timestamp)
+                await on_ticker_update(current_price)
                 await asyncio.sleep(update_interval)
 
             except ccxt.NetworkError as e:
@@ -94,7 +93,7 @@ class LiveExchangeService(ExchangeInterface):
     async def listen_to_ticker_updates(
         self, 
         pair: str, 
-        on_price_update: Callable[[float, float], None],
+        on_price_update: Callable[[float], None],
         update_interval: float = 1.0
     ) -> None:
         await self._subscribe_to_ticker_updates(pair, on_price_update, update_interval)

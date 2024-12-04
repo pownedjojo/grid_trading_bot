@@ -1,5 +1,6 @@
 import time
-from ..order import OrderSide, OrderType
+from typing import Optional
+from ..order import Order, OrderSide, OrderType, OrderStatus
 from .order_execution_strategy import OrderExecutionStrategy
 
 class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
@@ -9,17 +10,24 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
         pair: str, 
         quantity: float,
         price: float
-    ) -> dict:
+    ) -> Optional[Order]:
         order_id = f"backtest-{int(time.time())}"
-        return {
-            'id': order_id, 
-            'price': price,
-            'pair': pair, 
-            'side': order_side.name, 
-            'type': OrderType.MARKET, 
-            'filled_qty': quantity, 
-            'status': 'filled'
-        }
+        return Order(
+            identifier=order_id,
+            status=OrderStatus.OPEN,
+            order_type=OrderType.MARKET,
+            side=order_side,
+            price=price,
+            average=100,
+            amount=1,
+            filled=quantity,
+            remaining=0,
+            timestamp=1695890800,
+            datetime="111",
+            last_trade_timestamp=1,
+            symbol=pair,
+            time_in_force="GTC"
+        )
     
     async def execute_limit_order(
         self, 
@@ -27,23 +35,42 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
         pair: str, 
         quantity: float, 
         price: float
-    ) -> dict:
+    ) -> Optional[Order]:
         order_id = f"backtest-{int(time.time())}"
-        return {
-            'id': order_id, 
-            'price': price,
-            'pair': pair, 
-            'side': order_side.name, 
-            'type': OrderType.LIMIT, 
-            'filled_qty': quantity, 
-            'status': 'filled'
-        }
+        return Order(
+            identifier=order_id,
+            status=OrderStatus.OPEN,
+            order_type=OrderType.LIMIT,
+            side=order_side,
+            price=price,
+            average=100,
+            amount=1,
+            filled=quantity,
+            remaining=0,
+            timestamp=1695890800,
+            datetime="111",
+            last_trade_timestamp=1,
+            symbol=pair,
+            time_in_force="GTC"
+        )
     
     async def get_order(
         self, 
         order_id: str
-    ) -> dict:
-        return {
-            'id': order_id, 
-            'status': "filled"
-        }
+    ) -> Optional[Order]:
+        return Order(
+            identifier=order_id,
+            status=OrderStatus.OPEN,
+            order_type=OrderType.LIMIT,
+            side=OrderSide.BUY,
+            price=100,
+            average=100,
+            amount=1,
+            filled=1,
+            remaining=0,
+            timestamp=1695890800,
+            datetime="111",
+            last_trade_timestamp=1,
+            symbol="ETH/BTC",
+            time_in_force="GTC"
+        )

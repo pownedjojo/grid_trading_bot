@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Tuple
-from .order import Order, OrderSide, OrderState
+from .order import Order, OrderSide, OrderStatus
 from ..grid_management.grid_level import GridLevel
 
 class OrderBook:
@@ -14,7 +14,7 @@ class OrderBook:
         order: Order,
         grid_level: Optional[GridLevel] = None
     ) -> None:
-        if order.order_side == OrderSide.BUY:
+        if order.side == OrderSide.BUY:
             self.buy_orders.append(order)
         else:
             self.sell_orders.append(order)
@@ -39,18 +39,21 @@ class OrderBook:
     def get_all_sell_orders(self) -> List[Order]:
         return self.sell_orders
     
-    def get_pending_orders(self) -> List[Order]:
-        return [order for order in self.buy_orders + self.sell_orders if order.is_pending()]
+    def get_open_orders(self) -> List[Order]:
+        return [order for order in self.buy_orders + self.sell_orders if order.is_open()]
 
     def get_completed_orders(self) -> List[Order]:
-        return [order for order in self.buy_orders + self.sell_orders if order.is_completed()]
+        return [order for order in self.buy_orders + self.sell_orders if order.is_filled()]
 
-    def update_order_state(
+    def get_grid_level_for_order(self, order: Order) -> Optional[GridLevel]:
+        return self.order_to_grid_map.get(order)
+
+    def update_order_status(
         self, 
         order_id: str, 
-        new_state: OrderState
+        new_status: OrderStatus
     ) -> None:
         for order in self.buy_orders + self.sell_orders:
             if order.identifier == order_id:
-                order.state = new_state
+                order.status = new_status
                 break

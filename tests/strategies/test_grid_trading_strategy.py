@@ -114,47 +114,6 @@ class TestGridTradingStrategy:
 
         exchange_service.listen_to_ticker_updates.assert_called_once()
 
-    # async def test_execute_take_profit(self, setup_strategy):
-    #     strategy, config_manager, _, order_manager, balance_tracker, *_ = setup_strategy
-    #     config_manager.get_take_profit_threshold.return_value = 12000
-    #     balance_tracker.crypto_balance = 1
-
-    #     order_manager.execute_take_profit_or_stop_loss_order = AsyncMock()
-    #     await strategy._check_take_profit_stop_loss(12000, "2024-01-01T00:00:00Z")
-    #     order_manager.execute_take_profit_or_stop_loss_order.assert_awaited_once_with(
-    #         current_price=12000,
-    #         timestamp="2024-01-01T00:00:00Z",
-    #         take_profit_order=True
-    #     )
-
-    # async def test_execute_stop_loss(self, setup_strategy):
-    #     create_strategy, config_manager, _, order_manager, balance_tracker, *_ = setup_strategy
-    #     strategy = create_strategy()
-    #     config_manager.get_stop_loss_threshold.return_value = 8000
-    #     order_manager.execute_take_profit_or_stop_loss_order = AsyncMock()
-
-    #     await strategy._check_take_profit_stop_loss(8000, "2024-01-01T00:00:00Z")
-
-    #     order_manager.execute_take_profit_or_stop_loss_order.assert_awaited_once_with(
-    #         current_price=8000,
-    #         timestamp="2024-01-01T00:00:00Z",
-    #         stop_loss_order=True
-    #     )
-
-    # async def test_execute_orders_called_with_correct_parameters(self, setup_strategy):
-    #     # Unpack strategy and dependencies from setup_strategy
-    #     strategy, _, _, _, order_manager, _, _, _ = setup_strategy, order_manager
-
-    #     # Mock the execute_order method on the order_manager
-    #     strategy.order_manager.execute_order = AsyncMock()
-
-    #     # Run _execute_orders and assert the calls
-    #     await strategy._execute_orders(10000, 9500, "2024-01-01T00:00:00Z")
-    #     strategy.order_manager.execute_order.assert_has_calls([
-    #         call(OrderType.BUY, 10000, 9500, "2024-01-01T00:00:00Z"),
-    #         call(OrderType.SELL, 10000, 9500, "2024-01-01T00:00:00Z")
-    #     ])
-
     def test_generate_performance_report(self, setup_strategy):
         create_strategy, _, _, _, _, balance_tracker, trading_performance_analyzer, _ = setup_strategy
         strategy = create_strategy()

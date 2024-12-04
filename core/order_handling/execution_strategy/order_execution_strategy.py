@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from ..order import OrderSide
+from typing import Optional
+from ..order import Order, OrderSide
 
 class OrderExecutionStrategy(ABC):
     @abstractmethod
@@ -9,7 +10,7 @@ class OrderExecutionStrategy(ABC):
         pair: str, 
         quantity: float,
         price: float
-    ) -> dict:
+    ) -> Optional[Order]:
         pass
 
     @abstractmethod
@@ -19,12 +20,12 @@ class OrderExecutionStrategy(ABC):
         pair: str, 
         quantity: float, 
         price: float
-    ) -> dict:
+    ) -> Optional[Order]:
         pass
 
     @abstractmethod
     async def get_order(
         self, 
         order_id: str
-    ) -> dict:
+    ) -> Optional[Order]:
         pass

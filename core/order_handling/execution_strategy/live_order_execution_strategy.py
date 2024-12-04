@@ -1,6 +1,6 @@
 import time, logging, asyncio
 from typing import Optional
-from ..order import OrderType, OrderSide
+from ..order import Order, OrderType, OrderSide, OrderStatus
 from core.services.exchange_interface import ExchangeInterface
 from core.services.exceptions import DataFetchError
 from .order_execution_strategy import OrderExecutionStrategy
@@ -26,15 +26,16 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
         pair: str, 
         quantity: float, 
         price: float
-    ) -> dict:
+    ) -> Optional[Order]:
         for attempt in range(self.max_retries):
             try:
                 raw_order = await self.exchange_service.place_order(pair, OrderType.MARKET.value.lower(), order_side.name.lower(), quantity, price)
                 order_result = await self._parse_order_result(raw_order)
                 
-                if order_result['status'] == 'filled':
+                if order_result.status == OrderStatus.CLOSED:
                     return order_result  # Order fully filled
-                elif order_result['status'] == 'partially_filled':
+
+                elif order_result.status == OrderStatus.OPEN:
                     await self._handle_partial_fill(order_result, pair)
 
                 await asyncio.sleep(self.retry_delay)
@@ -53,7 +54,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
         pair: str, 
         quantity: float, 
         price: float
-    ) -> dict:
+    ) -> Optional[Order]:
         try:
             raw_order = await self.exchange_service.place_order(pair, OrderType.LIMIT.value.lower(), order_side.name.lower(), quantity, price)
             order_result = await self._parse_order_result(raw_order)
@@ -70,7 +71,7 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     async def get_order(
         self, 
         order_id: str
-    ) -> dict:
+    ) -> Optional[Order]:
         try:
             raw_order = await self.exchange_service.fetch_order(order_id)
             order_result = await self._parse_order_result(raw_order)
@@ -85,20 +86,36 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     async def _parse_order_result(
         self, 
         raw_order_result: dict
-    ) -> dict:
-        return {
-            'id': raw_order_result.get('id', ''),
-            'status': raw_order_result.get('status', 'unknown'),
-            'type': raw_order_result.get('type', 'unknown'),
-            'side': raw_order_result.get('side', 'unknown'),
-            'price': raw_order_result.get('price', 0.0),
-            'filled_qty': raw_order_result.get('filled', 0.0),
-            'remaining_qty': raw_order_result.get('remaining', 0.0),
-            'timestamp': raw_order_result.get('timestamp', int(time.time())),
-            'filled_price': raw_order_result.get('average', None),
-            'fee': raw_order_result.get('fee', None),
-            'cost': raw_order_result.get('cost', None)
-        }
+    ) -> Order:
+        """
+        Parses the raw order response from the exchange into an Order object.
+
+        Args:
+            raw_order_result: The raw response from the exchange.
+
+        Returns:
+            An Order object with standardized fields.
+        """
+        return Order(
+            identifier=raw_order_result.get("id", ""),
+            status=OrderStatus(raw_order_result.get("status", "unknown").lower()),
+            order_type=OrderType(raw_order_result.get("type", "unknown").lower()),
+            side=OrderSide(raw_order_result.get("side", "unknown").lower()),
+            price=raw_order_result.get("price", 0.0),
+            average=raw_order_result.get("average", None),
+            amount=raw_order_result.get("amount", 0.0),
+            filled=raw_order_result.get("filled", 0.0),
+            remaining=raw_order_result.get("remaining", 0.0),
+            timestamp=raw_order_result.get("timestamp", 0),
+            datetime=raw_order_result.get("datetime", None),
+            last_trade_timestamp=raw_order_result.get("lastTradeTimestamp", None),
+            symbol=raw_order_result.get("symbol", ""),
+            time_in_force=raw_order_result.get("timeInForce", None),
+            trades=raw_order_result.get("trades", []),
+            fee=raw_order_result.get("fee", None),
+            cost=raw_order_result.get("cost", None),
+            info=raw_order_result.get("info", raw_order_result),
+        )
 
     async def _adjust_price(
         self, 
@@ -111,14 +128,13 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
     
     async def _handle_partial_fill(
         self, 
-        order_result: dict, 
+        order: Order, 
         pair: str,
     ) -> Optional[dict]:
-        filled_qty = order_result.get('filled_qty', 0)
-        self.logger.info(f"Order partially filled with {filled_qty}. Attempting to cancel and retry full quantity.")
+        self.logger.info(f"Order partially filled with {order.filled}. Attempting to cancel and retry full quantity.")
 
-        if not await self._retry_cancel_order(order_result['id'], pair):
-            self.logger.error(f"Unable to cancel partially filled order {order_result['id']} after retries.")
+        if not await self._retry_cancel_order(order.identifier, pair):
+            self.logger.error(f"Unable to cancel partially filled order {order.identifier} after retries.")
 
     async def _retry_cancel_order(
         self, 
@@ -140,23 +156,3 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
 
             await asyncio.sleep(self.retry_delay)
         return False
-
-
-"""
-Order Result Structure:
-
-order_result = {
-    'id': str,                 # Unique identifier for the order provided by the exchange.
-    'status': str,             # Status of the order, e.g., 'filled', 'partially_filled', 'open', 'canceled'.
-    'type': str,               # Order type, e.g., 'limit', 'market'.
-    'side': str,               # Side of the order, e.g., 'buy' or 'sell'.
-    'price': float,            # Executed price of the order. For partially filled orders, this could be the average fill price.
-    'filled_qty': float,       # Quantity of the order that has been filled. Should match `quantity` if fully filled.
-    'remaining_qty': float,    # Quantity still remaining to be filled.
-    'timestamp': int or str,   # Timestamp when the order was placed.
-    # Optional Fields:
-    'filled_price': float,     # The average price of the filled portion (if the API provides it separately).
-    'fee': float,              # Total fee incurred for the order (if available).
-    'cost': float              # Total cost of the order execution.
-}
-"""

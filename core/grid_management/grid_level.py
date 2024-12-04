@@ -1,36 +1,74 @@
-from enum import Enum, auto
+from enum import Enum
 from typing import List, Optional
 from ..order_handling.order import Order
 
-class GridLevelState(Enum):
-    READY_TO_BUY = auto()
-    READY_TO_SELL = auto()
-    COMPLETED = auto()   
-    READY_TO_BUY_SELL = auto()  # For hedged grids
+class GridCycleState(Enum):
+    READY_TO_BUY = "ready_to_buy"               # Level is ready for a buy order
+    WAITING_FOR_BUY_FILL = "waiting_for_buy_fill"  # Buy order placed, waiting for execution
+    READY_TO_SELL = "ready_to_sell"             # Level is ready for a sell order
+    WAITING_FOR_SELL_FILL = "waiting_for_sell_fill"  # Sell order placed, waiting for execution
+    READY_TO_BUY_SELL = "ready_to_buy_sell"     # Level can handle both buy/sell simultaneously
+    COMPLETED = "completed"                     # Level completed its buy-sell cycle and ready to reset
 
 class GridLevel:
-    def __init__(self, price: float, state: GridLevelState):
+    def __init__(self, price: float, state: GridCycleState):
         self.price: float = price
-        self.buy_orders: List[Order] = []
-        self.sell_orders: List[Order] = []
-        self.state: GridLevelState = state
-    
+        self.buy_orders: List[Order] = []  # Track all buy orders at this level
+        self.sell_orders: List[Order] = []  # Track all sell orders at this level
+        self.pending_buy_order: Optional[Order] = None  # The currently pending buy order, if any
+        self.pending_sell_order: Optional[Order] = None  # The currently pending sell order, if any
+        self.state: GridCycleState = state
+
     def place_buy_order(self, buy_order: Order) -> None:
+        """
+        Record a buy order at this level and update state.
+        """
         self.buy_orders.append(buy_order)
-        self.state = GridLevelState.READY_TO_SELL
+        self.pending_buy_order = buy_order
+        self.state = GridCycleState.WAITING_FOR_BUY_FILL
+
+    def complete_buy_order(self) -> None:
+        """
+        Mark the pending buy order as filled and prepare for the sell order.
+        """
+        self.pending_buy_order = None
+        self.state = GridCycleState.READY_TO_SELL
 
     def place_sell_order(self, sell_order: Order) -> None:
+        """
+        Record a sell order at this level and update state.
+        """
         self.sell_orders.append(sell_order)
-    
+        self.pending_sell_order = sell_order
+        self.state = GridCycleState.WAITING_FOR_SELL_FILL
+
+    def complete_sell_order(self) -> None:
+        """
+        Mark the pending sell order as filled and reset the cycle.
+        """
+        self.pending_sell_order = None
+        self.state = GridCycleState.READY_TO_BUY
+
     def can_place_buy_order(self) -> bool:
-        return self.state == GridLevelState.READY_TO_BUY
+        """
+        Check if a buy order can be placed at this level.
+        """
+        return self.state in {GridCycleState.READY_TO_BUY, GridCycleState.READY_TO_BUY_SELL}
 
     def can_place_sell_order(self) -> bool:
-        return self.state == GridLevelState.READY_TO_SELL
-    
-    def reset_buy_level_cycle(GridLevelState) -> None:
-        self.state = GridLevelState.READY_TO_BUY
-    
+        """
+        Check if a sell order can be placed at this level.
+        """
+        return self.state in {GridCycleState.READY_TO_SELL, GridCycleState.READY_TO_BUY_SELL}
+
+    def reset_cycle(self) -> None:
+        """
+        Reset the grid level to the initial buy-ready state.
+        """
+        self.pending_buy_order = None
+        self.pending_sell_order = None
+        self.state = GridCycleState.READY_TO_BUY
+
     def __str__(self) -> str:
         latest_buy_order: Optional[Order] = self.buy_orders[-1] if self.buy_orders else None
         latest_sell_order: Optional[Order] = self.sell_orders[-1] if self.sell_orders else None
@@ -39,6 +77,8 @@ class GridLevel:
             f"state={self.state.name}, "
             f"num_buy_orders={len(self.buy_orders)}, "
             f"num_sell_orders={len(self.sell_orders)}, "
+            f"pending_buy_order={self.pending_buy_order}, "
+            f"pending_sell_order={self.pending_sell_order}, "
             f"latest_buy_order={latest_buy_order}, "
             f"latest_sell_order={latest_sell_order})"
         )

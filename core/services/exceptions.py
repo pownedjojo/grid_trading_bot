@@ -25,7 +25,3 @@ class OrderCancellationError(Exception):
 class MissingEnvironmentVariableError(Exception):
     """Raised when env variable are missing (EXCHANGE_API_KEY and/or EXCHANGE_SECRET_KEY)."""
     pass
-
-class InvalidOrderTypeError(Exception):
-    """Raised when an invalid order type has been specified."""
-    pass

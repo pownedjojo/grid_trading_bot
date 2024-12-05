@@ -1,6 +1,5 @@
-import logging, asyncio
-from typing import Union
-from .order import Order, OrderStatus, OrderType, OrderSide
+import logging
+from .order import Order, OrderSide
 from ..order_handling.balance_tracker import BalanceTracker
 from config.config_manager import ConfigManager
 from ..order_handling.order_book import OrderBook
@@ -36,9 +35,6 @@ class OrderManager:
         self.order_execution_strategy = order_execution_strategy
         self.notification_handler = notification_handler
         self.pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
-
-        ## TODO: Lock to remove ?
-        self.finalize_order_placement_lock = asyncio.Lock()
         self.event_bus.subscribe(Events.ORDER_COMPLETED, self._on_order_completed)
     
     async def initialize_grid_orders(self):
@@ -52,6 +48,10 @@ class OrderManager:
                 try:
                     order_quantity = self.grid_manager.get_order_size_per_grid(price)
                     self.logger.info(f"Placing initial buy limit order at grid level {price} for {order_quantity} {self.pair}.")
+
+                    self.transaction_validator.validate_buy_order(self.balance_tracker.balance, order_quantity, price, grid_level)
+
+                    self.balance_tracker.reserve_funds_for_buy(order_quantity * price)
 
                     order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, order_quantity, price)
 
@@ -89,6 +89,7 @@ class OrderManager:
 
                 if paired_sell_level and paired_sell_level.can_place_sell_order():
                     self.logger.info(f"Placing sell limit order at grid level {paired_sell_level.price} for quantity {order.filled}")
+                    self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, order.filled, paired_sell_level)
                     sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, order.filled, paired_sell_level.price)
                     
                     if sell_order is None:
@@ -134,18 +135,15 @@ class OrderManager:
             return
 
         event = "Take profit" if take_profit_order else "Stop loss"
-        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
-
         try:
             quantity = self.balance_tracker.crypto_balance
-            order = await self.order_execution_strategy.execute_market_order(OrderSide.SELL, pair, quantity, current_price)
+            order = await self.order_execution_strategy.execute_market_order(OrderSide.SELL, self.pair, quantity, current_price)
 
             if not order:
                 self.logger.error(f"Order execution failed: {order}")
                 raise Exception
 
             self.order_book.add_order(order)
-            await self.balance_tracker.update_after_sell(order.amount, order.price)
             await self.notification_handler.async_send_notification(
                 NotificationType.TAKE_PROFIT_TRIGGERED if take_profit_order else NotificationType.STOP_LOSS_TRIGGERED,
                 order_details=str(order)
@@ -170,7 +168,8 @@ class OrderManager:
 
             if quantity > 0:
                 self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
-                await self._place_order(grid_level, OrderSide.BUY, OrderType.MARKET, current_price, quantity)
+                buy_order = await self.order_execution_strategy.execute_market_order(OrderSide.BUY, self.pair, quantity, current_price)
+                self.logger.info(f"Market BUY Order placed: {buy_order}")
             
         except GridLevelNotReadyError as e:
             self.logger.debug(f"{e}")
@@ -203,8 +202,8 @@ class OrderManager:
 
             if quantity > 0:
                 self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, buy_order.amount, grid_level)
-                await self._place_order(grid_level, OrderSide.SELL, OrderType.MARKET, current_price, quantity)
-                self.grid_manager.reset_grid_cycle(buy_grid_level)
+                sell_order = await self.order_execution_strategy.execute_market_order(OrderSide.SELL, self.pair, quantity, current_price)
+                self.logger.info(f"Market SELL Order placed: {sell_order}")
         
         except GridLevelNotReadyError as e:
             self.logger.debug(f"Cannot process sell order: {e}")
@@ -219,36 +218,3 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"Unexpected error while processing sell order: {e}")
             await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Unexpected error while processing sell order: {e}")
-    
-    async def _place_order(
-        self, 
-        grid_level: GridLevel, 
-        order_side: OrderSide, 
-        order_type: OrderType, 
-        current_price: float, 
-        quantity: float
-    ) -> None:
-        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
-        order = await self.order_execution_strategy.execute_market_order(order_side, pair, quantity, current_price)            
-
-        if order is not None and order.status == OrderStatus.CLOSED:
-            await self._finalize_order_placement(order, grid_level)              
-            await self.notification_handler.async_send_notification(NotificationType.ORDER_PLACED, order_details=str(order))
-        else:
-            raise OrderExecutionFailedError("Order could not be fully filled", order_side, order_type, pair, quantity, current_price)
-
-    async def _finalize_order_placement(
-        self, 
-        order: Order, 
-        grid_level: GridLevel
-    ) -> None:
-        async with self.finalize_order_placement_lock:
-            if order.side == OrderSide.BUY:
-                grid_level.place_buy_order(order)
-                await self.balance_tracker.update_after_buy(order.amount, order.price)
-            else:
-                grid_level.place_sell_order(order)
-                await self.balance_tracker.update_after_sell(order.amount, order.price)
-            
-            self.order_book.add_order(order, grid_level)
-            self.logger.debug(f"{order.side} order placed at {order.price} for grid level {grid_level.price}")

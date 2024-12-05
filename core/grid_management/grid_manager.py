@@ -27,9 +27,16 @@ class GridManager:
             self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY if price <= self.central_price else GridCycleState.READY_TO_SELL) for price in self.price_grids}
         
         elif self.strategy_type == StrategyType.HEDGED_GRID:
-            self.sorted_buy_grids = self.price_grids[:-1]  # Buy from all except the top grid
-            self.sorted_sell_grids = self.price_grids[1:]  # Sell on all except the bottom grid
-            self.grid_levels = {price: GridLevel(price, GridCycleState.READY_TO_BUY_SELL) for price in self.price_grids}
+            self.sorted_buy_grids = self.price_grids[:-1]  # All except the top grid
+            self.sorted_sell_grids = self.price_grids[1:]  # All except the bottom grid
+            self.grid_levels = {
+                price: GridLevel(
+                    price,
+                    GridCycleState.READY_TO_BUY if price != self.price_grids[-1] else GridCycleState.READY_TO_SELL
+                )
+                for price in self.price_grids
+            }
+        self.logger.info(f"Grids and levels initialized. Central price: {self.central_price}")
     
     def get_crossed_grid_level(
         self, 
@@ -57,13 +64,6 @@ class GridManager:
         total_grids = len(self.grid_levels)
         order_size = self.initial_balance / total_grids / current_price
         return order_size
-    
-    def reset_grid_cycle(
-        self, 
-        buy_grid_level: GridLevel
-    ) -> None:
-        # buy_grid_level.reset_buy_level_cycle()
-        self.logger.debug(f"Buy Grid level at price {buy_grid_level.price} is reset and ready for the next buy/sell cycle.")
     
     def _get_grid_level(
         self, 

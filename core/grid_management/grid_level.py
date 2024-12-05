@@ -7,8 +7,6 @@ class GridCycleState(Enum):
     WAITING_FOR_BUY_FILL = "waiting_for_buy_fill"  # Buy order placed, waiting for execution
     READY_TO_SELL = "ready_to_sell"             # Level is ready for a sell order
     WAITING_FOR_SELL_FILL = "waiting_for_sell_fill"  # Sell order placed, waiting for execution
-    READY_TO_BUY_SELL = "ready_to_buy_sell"     # Level can handle both buy/sell simultaneously
-    COMPLETED = "completed"                     # Level completed its buy-sell cycle and ready to reset
 
 class GridLevel:
     def __init__(self, price: float, state: GridCycleState):
@@ -53,13 +51,13 @@ class GridLevel:
         """
         Check if a buy order can be placed at this level.
         """
-        return self.state in {GridCycleState.READY_TO_BUY, GridCycleState.READY_TO_BUY_SELL}
+        return self.state == GridCycleState.READY_TO_BUY
 
     def can_place_sell_order(self) -> bool:
         """
         Check if a sell order can be placed at this level.
         """
-        return self.state in {GridCycleState.READY_TO_SELL, GridCycleState.READY_TO_BUY_SELL}
+        return self.state == GridCycleState.READY_TO_SELL
 
     def reset_cycle(self) -> None:
         """

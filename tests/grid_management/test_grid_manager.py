@@ -203,12 +203,3 @@ class TestGridManager:
         assert result == expected_order_size
     
     import pytest
-
-    def test_reset_grid_cycle_calls_reset_buy_level_cycle(self, grid_manager):
-        mock_grid_level = Mock(spec=GridLevel)
-        mock_grid_level.price = 1300
-        mock_grid_level.reset_buy_level_cycle = Mock()
-
-        grid_manager.reset_grid_cycle(mock_grid_level)
-
-        mock_grid_level.reset_buy_level_cycle.assert_called_once()

@@ -35,12 +35,12 @@ class TradingPerformanceAnalyzer:
         sell_orders = self.order_book.get_all_sell_orders()
 
         for buy_order in buy_orders:
-            trade_value = buy_order.quantity * buy_order.price
+            trade_value = buy_order.amount * buy_order.price
             buy_fee = trade_value * self.trading_fee
             total_buy_cost += trade_value + buy_fee
 
         for sell_order in sell_orders:
-            trade_value = sell_order.quantity * sell_order.price
+            trade_value = sell_order.amount * sell_order.price
             sell_fee = trade_value * self.trading_fee
             total_sell_revenue += trade_value - sell_fee
 
@@ -101,13 +101,13 @@ class TradingPerformanceAnalyzer:
     def _format_order(self, order: Order, grid_level: Optional[GridLevel]) -> List[Union[str, float]]:
         grid_level_price = grid_level.price if grid_level else "N/A"
         # Assuming order.price is the execution price and grid level price the expected price
-        slippage = ((order.price - grid_level_price) / grid_level_price) * 100 if grid_level else "N/A"
+        slippage = ((order.average - grid_level_price) / grid_level_price) * 100 if grid_level else "N/A"
         return [
-            order.order_side.name,
+            order.side.name,
             order.order_type.name,
             order.price, 
-            order.quantity, 
-            order.timestamp, 
+            order.filled, 
+            order.last_trade_timestamp, 
             grid_level_price, 
             f"{slippage:.2f}%" if grid_level else "N/A"
         ]

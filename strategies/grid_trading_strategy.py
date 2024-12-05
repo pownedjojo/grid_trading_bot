@@ -107,16 +107,20 @@ class GridTradingStrategy(TradingStrategy):
         self.logger.info("Starting backtest simulation")
         self.data['account_value'] = np.nan
         self.close_prices = self.data['close'].values
+        self.high_prices = self.data['high'].values
+        self.low_prices = self.data['low'].values
         timestamps = self.data.index
         initial_price = self.close_prices[0]
         self.data.loc[timestamps[0], 'account_value'] = await self.balance_tracker.get_total_balance_value(initial_price)
 
-        for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), timestamps[1:]):
+        for i, (current_price, high_price, low_price, timestamp) in enumerate(zip(self.close_prices, self.high_prices, self.low_prices, timestamps)):
+            await self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
+
             if await self._check_take_profit_stop_loss(current_price):
                 break
 
-            self.data.loc[current_timestamp, 'account_value'] = await self.balance_tracker.get_total_balance_value(current_price)
-    
+            self.data.loc[timestamp, 'account_value'] = await self.balance_tracker.get_total_balance_value(current_price)
+
     def generate_performance_report(self) -> Tuple[dict, list]:
         final_price = self.close_prices[-1]
         return self.trading_performance_analyzer.generate_performance_summary(

@@ -1,5 +1,6 @@
 import logging
-from .order import Order, OrderSide
+from typing import Union
+from .order import Order, OrderSide, OrderStatus
 from ..order_handling.balance_tracker import BalanceTracker
 from config.config_manager import ConfigManager
 from ..order_handling.order_book import OrderBook
@@ -67,7 +68,10 @@ class OrderManager:
                     self.logger.error(f"Unexpected error during buy order initialization at grid level {price}: {e}", exc_info=True)
                     await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place order: {e}")
     
-    async def _on_order_completed(self, order: Order) -> None:
+    async def _on_order_completed(
+        self, 
+        order: Order
+    ) -> None:
         """
         Handles completed orders and places paired orders as needed.
 
@@ -116,6 +120,18 @@ class OrderManager:
         take_profit_order: bool = False,
         stop_loss_order: bool = False
     ) -> None:
+        """
+        Executes a sell order triggered by either a take-profit or stop-loss event.
+
+        This method checks whether a take-profit or stop-loss condition has been met
+        and places a market sell order accordingly. It uses the crypto balance tracked
+        by the `BalanceTracker` and sends notifications upon success or failure.
+
+        Args:
+            current_price (float): The current market price triggering the event.
+            take_profit_order (bool): Indicates whether this is a take-profit event.
+            stop_loss_order (bool): Indicates whether this is a stop-loss event.
+        """
         if not (take_profit_order or stop_loss_order):
             self.logger.warning("No take profit or stop loss action specified.")
             return
@@ -143,3 +159,29 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
             await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place {event} order: {e}")
+    
+    async def simulate_order_fills(
+        self, 
+        high_price: float, 
+        low_price: float, 
+        timestamp: Union[int, str]
+    ) -> None:
+        """
+        Simulates the execution of limit orders based on the high and low prices of the current step.
+
+        Args:
+            high_price: The highest price reached in this time interval.
+            low_price: The lowest price reached in this time interval.
+            timestamp: The current timestamp in the backtest simulation.
+        """
+        pending_orders = self.order_book.get_open_orders()
+
+        for order in pending_orders:
+            if (order.side == OrderSide.BUY and order.price >= low_price) or (order.side == OrderSide.SELL and order.price <= high_price):
+                order.filled = order.amount
+                order.remaining = 0.0
+                order.status = OrderStatus.CLOSED
+                order.last_trade_timestamp = int(timestamp)
+
+                self.logger.info(f"Simulated fill for {order.side.value.upper()} order at price {order.price} with amount {order.amount}. Filled at timestamp {timestamp}")
+                await self.event_bus.publish(Events.ORDER_COMPLETED, order)

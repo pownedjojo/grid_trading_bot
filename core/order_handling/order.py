@@ -40,22 +40,22 @@ class Order:
         info: Optional[Dict[str, Union[str, float, dict]]] = None
     ):
         self.identifier = identifier
-        self.status = status
-        self.order_type = order_type
-        self.side = side
-        self.price = price
-        self.average = average
-        self.amount = amount
-        self.filled = filled
-        self.remaining = remaining
-        self.timestamp = timestamp
-        self.datetime = datetime
-        self.last_trade_timestamp = last_trade_timestamp
-        self.symbol = symbol
-        self.time_in_force = time_in_force
-        self.trades = trades
-        self.fee = fee
-        self.cost = cost
+        self.status = status # 'open', 'closed', 'canceled', 'expired', 'rejected'
+        self.order_type = order_type # 'market', 'limit'
+        self.side = side # 'buy', 'sell'
+        self.price = price # float price in quote currency (may be empty for market orders)
+        self.average = average # float average filling price
+        self.amount = amount # ordered amount of base currency
+        self.filled = filled # filled amount of base currency
+        self.remaining = remaining # remaining amount to fill
+        self.timestamp = timestamp # order placing/opening Unix timestamp in milliseconds
+        self.datetime = datetime # ISO8601 datetime of 'timestamp' with milliseconds
+        self.last_trade_timestamp = last_trade_timestamp # Unix timestamp of the most recent trade on this order
+        self.symbol = symbol # symbol
+        self.time_in_force = time_in_force # 'GTC', 'IOC', 'FOK', 'PO'
+        self.trades = trades # a list of order trades/executions
+        self.fee = fee # fee info, if available
+        self.cost = cost # 'filled' * 'price' (filling price used where available)
         self.info = info  # Original unparsed structure for debugging or auditing
 
     def is_filled(self) -> bool:

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock
 from core.validation.transaction_validator import TransactionValidator
-from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
+from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
 
 class TestTransactionValidator:
     @pytest.fixture
@@ -50,23 +50,6 @@ class TestTransactionValidator:
         quantity = 3
 
         with pytest.raises(InsufficientCryptoBalanceError, match="Insufficient crypto balance"):
-            validator.validate_sell_order(crypto_balance, quantity, grid_level)
-
-    def test_validate_buy_order_grid_level_not_ready(self, validator, grid_level):
-        grid_level.can_place_buy_order.return_value = False
-        balance = 5000
-        quantity = 1
-        price = 3000
-
-        with pytest.raises(GridLevelNotReadyError, match="Grid level .* is not ready for a buy order"):
-            validator.validate_buy_order(balance, quantity, price, grid_level)
-
-    def test_validate_sell_order_grid_level_not_ready(self, validator, grid_level):
-        grid_level.can_place_sell_order.return_value = False
-        crypto_balance = 5
-        quantity = 3
-
-        with pytest.raises(GridLevelNotReadyError, match="Grid level .* is not ready for a sell order"):
             validator.validate_sell_order(crypto_balance, quantity, grid_level)
 
     def test_validate_buy_order_with_tolerance(self, validator, grid_level):

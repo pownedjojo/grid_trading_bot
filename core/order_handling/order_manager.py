@@ -4,10 +4,8 @@ from ..order_handling.balance_tracker import BalanceTracker
 from config.config_manager import ConfigManager
 from ..order_handling.order_book import OrderBook
 from ..grid_management.grid_manager import GridManager
-from ..grid_management.grid_level import GridLevel
 from ..validation.transaction_validator import TransactionValidator
 from core.bot_management.event_bus import EventBus, Events
-from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
 from .execution_strategy.order_execution_strategy import OrderExecutionStrategy
 from core.bot_management.notification.notification_handler import NotificationHandler
 from core.bot_management.notification.notification_content import NotificationType
@@ -50,7 +48,6 @@ class OrderManager:
                     self.logger.info(f"Placing initial buy limit order at grid level {price} for {order_quantity} {self.pair}.")
 
                     self.transaction_validator.validate_buy_order(self.balance_tracker.balance, order_quantity, price, grid_level)
-
                     self.balance_tracker.reserve_funds_for_buy(order_quantity * price)
 
                     order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, order_quantity, price)
@@ -64,9 +61,11 @@ class OrderManager:
 
                 except OrderExecutionFailedError as e:
                     self.logger.error(f"Failed to initialize buy order at grid level {price} - {str(e)}", exc_info=True)
+                    await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place order: {e}")
 
                 except Exception as e:
                     self.logger.error(f"Unexpected error during buy order initialization at grid level {price}: {e}", exc_info=True)
+                    await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place order: {e}")
     
     async def _on_order_completed(self, order: Order) -> None:
         """
@@ -93,7 +92,7 @@ class OrderManager:
                     sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, order.filled, paired_sell_level.price)
                     
                     if sell_order is None:
-                        ## TODO: handle this case
+                        await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED)       
                         self.logger.error(f"Failed to place sell order at {paired_sell_level.price}: No order returned.")
                         return
         
@@ -103,27 +102,14 @@ class OrderManager:
             elif order.side == OrderSide.SELL:
                 self.logger.info(f"Sell order completed at grid level {grid_level.price}.")
                 self.grid_manager.complete_sell_order(grid_level)
+        
+        except OrderExecutionFailedError as e:
+            self.logger.error(f"Failed while handling completed order - {str(e)}", exc_info=True)
+            await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place order: {e}")
 
         except Exception as e:
             self.logger.error(f"Error handling completed order {order.identifier}: {e}")
 
-    async def execute_order(
-        self,
-        order_side: OrderSide,
-        current_price: float,
-        previous_price: float
-    ) -> None:
-        crossed_grid_level = self.grid_manager.get_crossed_grid_level(current_price, previous_price, sell=(order_side == OrderSide.SELL))
-
-        if crossed_grid_level is None:
-            self.logger.debug(f"No grid level crossed for {order_side} Order")
-            return
-                
-        if order_side == OrderSide.BUY:
-            await self._process_buy_order(crossed_grid_level, current_price)
-        else:
-            await self._process_sell_order(crossed_grid_level, current_price)
-    
     async def execute_take_profit_or_stop_loss_order(
         self,
         current_price: float,
@@ -157,64 +143,3 @@ class OrderManager:
         except Exception as e:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
             await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place {event} order: {e}")
-
-    async def _process_buy_order(
-        self,
-        grid_level: GridLevel, 
-        current_price: float
-    ) -> None:
-        try:
-            quantity = self.grid_manager.get_order_size_per_grid(current_price)
-
-            if quantity > 0:
-                self.transaction_validator.validate_buy_order(self.balance_tracker.balance, quantity, current_price, grid_level)
-                buy_order = await self.order_execution_strategy.execute_market_order(OrderSide.BUY, self.pair, quantity, current_price)
-                self.logger.info(f"Market BUY Order placed: {buy_order}")
-            
-        except GridLevelNotReadyError as e:
-            self.logger.debug(f"{e}")
-
-        except InsufficientBalanceError as e:
-            self.logger.warning(e)
-        
-        except OrderExecutionFailedError as e:
-            self.logger.error(f"Order execution failed: {str(e)}")
-            await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place order: {e}")
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error while processing buy order: {e}")
-            await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Unexpected error while processing buy order: {e}")
-    
-    async def _process_sell_order(
-        self, 
-        grid_level: GridLevel, 
-        current_price: float
-    ) -> None:
-        buy_grid_level = self.grid_manager.find_lowest_completed_buy_grid()
-
-        if buy_grid_level is None:
-            self.logger.debug(f"No grid level found with a completed buy order.")
-            return
-
-        try:
-            buy_order = buy_grid_level.buy_orders[-1]
-            quantity = min(buy_order.amount, self.balance_tracker.crypto_balance)
-
-            if quantity > 0:
-                self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, buy_order.amount, grid_level)
-                sell_order = await self.order_execution_strategy.execute_market_order(OrderSide.SELL, self.pair, quantity, current_price)
-                self.logger.info(f"Market SELL Order placed: {sell_order}")
-        
-        except GridLevelNotReadyError as e:
-            self.logger.debug(f"Cannot process sell order: {e}")
-
-        except InsufficientCryptoBalanceError as e:
-            self.logger.warning(f"Cannot process sell order: {e}")
-        
-        except OrderExecutionFailedError as e:
-            self.logger.error(f"Order execution failed: {str(e)}")
-            await self.notification_handler.async_send_notification(NotificationType.ORDER_FAILED, error_details=f"Failed to place order: {e}")
-
-        except Exception as e:
-            self.logger.error(f"Unexpected error while processing sell order: {e}")
-            await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Unexpected error while processing sell order: {e}")

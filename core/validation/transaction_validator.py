@@ -1,6 +1,5 @@
-from ..order_handling.order import OrderSide
 from ..grid_management.grid_level import GridLevel
-from .exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
+from .exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
 
 class TransactionValidator:
     def __init__(

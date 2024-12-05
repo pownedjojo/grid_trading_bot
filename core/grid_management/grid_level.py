@@ -59,14 +59,6 @@ class GridLevel:
         """
         return self.state == GridCycleState.READY_TO_SELL
 
-    def reset_cycle(self) -> None:
-        """
-        Reset the grid level to the initial buy-ready state.
-        """
-        self.pending_buy_order = None
-        self.pending_sell_order = None
-        self.state = GridCycleState.READY_TO_BUY
-
     def __str__(self) -> str:
         latest_buy_order: Optional[Order] = self.buy_orders[-1] if self.buy_orders else None
         latest_sell_order: Optional[Order] = self.sell_orders[-1] if self.sell_orders else None

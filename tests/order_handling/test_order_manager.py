@@ -6,7 +6,7 @@ from core.grid_management.grid_level import GridLevel
 from core.services.exchange_interface import ExchangeInterface
 from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
 from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
-from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError, GridLevelNotReadyError
+from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
 from core.bot_management.notification.notification_content import NotificationType
 
 class TestOrderManager:

@@ -70,8 +70,6 @@ class GridTradingStrategy(TradingStrategy):
 
     async def run(self):
         self._running = True
-
-        ## NEW:
         await self.order_manager.initialize_grid_orders()
 
         if self.trading_mode == TradingMode.BACKTEST:
@@ -92,9 +90,6 @@ class GridTradingStrategy(TradingStrategy):
             if not self._running:
                 self.logger.info("Trading stopped; halting price updates.")
                 return
-
-            # if last_price is not None:
-            #     await self._execute_orders(current_price, last_price)
 
             if await self._check_take_profit_stop_loss(current_price):
                 self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
@@ -119,7 +114,7 @@ class GridTradingStrategy(TradingStrategy):
         for (current_price, previous_price), current_timestamp in zip(itertools.pairwise(self.close_prices), timestamps[1:]):
             if await self._check_take_profit_stop_loss(current_price):
                 break
-            await self._execute_orders(current_price, previous_price)
+
             self.data.loc[current_timestamp, 'account_value'] = await self.balance_tracker.get_total_balance_value(current_price)
     
     def generate_performance_report(self) -> Tuple[dict, list]:
@@ -137,14 +132,6 @@ class GridTradingStrategy(TradingStrategy):
             self.plotter.plot_results(self.data)
         else:
             self.logger.info("Plotting is not available for live/paper trading mode.")
-    
-    async def _execute_orders(
-        self, 
-        current_price: float, 
-        previous_price: float
-    ) -> None:
-        await self.order_manager.execute_order(OrderSide.BUY, current_price, previous_price)
-        await self.order_manager.execute_order(OrderSide.SELL, current_price, previous_price)
 
     async def _check_take_profit_stop_loss(
         self, 

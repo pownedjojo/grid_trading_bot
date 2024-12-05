@@ -3,21 +3,27 @@ import apprise, logging, asyncio
 from concurrent.futures import ThreadPoolExecutor
 from .notification_content import NotificationType
 from config.trading_mode import TradingMode
+from core.bot_management.event_bus import EventBus, Events
+from core.order_handling.order import Order
 
 class NotificationHandler:
     _executor = ThreadPoolExecutor(max_workers=3)
 
     def __init__(
         self, 
+        event_bus: EventBus,
         urls: Optional[List[str]], 
         trading_mode: TradingMode
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.event_bus = event_bus
         self.enabled = bool(urls) and trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}
         self.lock = asyncio.Lock()
         self.apprise_instance = apprise.Apprise() if self.enabled else None
         
         if self.enabled:
+            self.event_bus.subscribe(Events.ORDER_COMPLETED, self._send_notification_on_order_completed)
+
             for url in urls:
                 self.apprise_instance.add(url)
 
@@ -57,3 +63,6 @@ class NotificationHandler:
                 )
             except Exception as e:
                 self.logger.error(f"Failed to send notification: {str(e)}")
+    
+    async def _send_notification_on_order_completed(self, order: Order) -> None:
+        await self.async_send_notification(NotificationType.ORDER_PLACED, order_details=str(order))

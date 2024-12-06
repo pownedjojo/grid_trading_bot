@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, List, Dict, Union
+import pandas as pd
 
 class OrderSide(Enum):
     BUY = 'buy'
@@ -66,6 +67,11 @@ class Order:
 
     def is_open(self) -> bool:
         return self.status == OrderStatus.OPEN
+    
+    def format_last_trade_timestamp(self) -> Optional[str]:
+        if self.last_trade_timestamp is None:
+            return None
+        return pd.Timestamp(self.last_trade_timestamp, unit='s').isoformat()
 
     def __str__(self) -> str:
         return (
@@ -75,7 +81,6 @@ class Order:
             f"timestamp={self.timestamp}, datetime={self.datetime}, symbol={self.symbol}, "
             f"time_in_force={self.time_in_force}, trades={self.trades}, fee={self.fee}, cost={self.cost})"
         )
-
 
     def __repr__(self) -> str:
         return self.__str__()

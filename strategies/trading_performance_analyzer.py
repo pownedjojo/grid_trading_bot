@@ -95,7 +95,7 @@ class TradingPerformanceAnalyzer:
         for sell_order, grid_level in sell_orders_with_grid:
             orders.append(self._format_order(sell_order, grid_level))
         
-        orders.sort(key=lambda x: (x[4] is None, x[4]))  # x[4] is the timestamp, sort None to the end
+        orders.sort(key=lambda x: (x[5] is None, x[5]))  # x[5] is the timestamp, sort None to the end
         return orders
     
     def _format_order(self, order: Order, grid_level: Optional[GridLevel]) -> List[Union[str, float]]:
@@ -105,9 +105,10 @@ class TradingPerformanceAnalyzer:
         return [
             order.side.name,
             order.order_type.name,
+            order.status.name,
             order.price, 
             order.filled, 
-            order.last_trade_timestamp, 
+            order.format_last_trade_timestamp(), 
             grid_level_price, 
             f"{slippage:.2f}%" if grid_level else "N/A"
         ]
@@ -171,7 +172,7 @@ class TradingPerformanceAnalyzer:
 
         formatted_orders = self.get_formatted_orders()
 
-        orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
+        orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Status", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
         self.logger.info("\nFormatted Orders:\n" + orders_table)
 
         summary_table = tabulate(performance_summary.items(), headers=["Metric", "Value"], tablefmt="grid")

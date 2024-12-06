@@ -37,27 +37,8 @@ class GridManager:
                 for price in self.price_grids
             }
         self.logger.info(f"Grids and levels initialized. Central price: {self.central_price}")
-    
-    def get_crossed_grid_level(
-        self, 
-        current_price: float, 
-        previous_price: float, 
-        sell: bool = False
-    ) -> Optional[GridLevel]:
-        grid_list = self.sorted_sell_grids if sell else self.sorted_buy_grids
-        for grid_price in grid_list:
-            if (sell and previous_price < grid_price <= current_price) or (not sell and previous_price >= grid_price >= current_price):
-                return self._get_grid_level(grid_price)
-        return None
 
-    def find_lowest_completed_buy_grid(self) -> Optional[GridLevel]:
-        for price in self.sorted_buy_grids:
-            grid_level = self.grid_levels.get(price)
-            if grid_level and grid_level.can_place_sell_order():
-                return grid_level
-        return None
-
-    def get_order_size_per_grid(
+    def get_order_size_for_grid_level(
         self,
         current_price: float
     ) -> float:
@@ -65,27 +46,43 @@ class GridManager:
         order_size = self.initial_balance / total_grids / current_price
         return order_size
     
-    def _get_grid_level(
-        self, 
-        price: float
-    ) -> Optional[GridLevel]:
-        return self.grid_levels.get(price)
-    
     def get_paired_sell_level(self, buy_grid_level: GridLevel) -> Optional[GridLevel]:
         """
-        Retrieves the grid level immediately above the provided buy grid level.
+        Determines the paired sell level for a given buy grid level based on the strategy type.
 
         Args:
-            buy_grid_level: The GridLevel for which the paired sell level is needed.
+            buy_grid_level: The buy grid level for which the paired sell level is required.
 
         Returns:
-            The paired sell grid level, or None if no paired level exists.
+            The paired sell grid level, or None if no valid level exists.
         """
-        current_index = self.sorted_buy_grids.index(buy_grid_level.price)
-        if current_index + 1 < len(self.sorted_sell_grids):
-            next_price = self.sorted_sell_grids[current_index + 1]
-            return self._get_grid_level(next_price)
-        return None
+        if self.strategy_type == StrategyType.SIMPLE_GRID:
+            for sell_price in self.sorted_sell_grids:
+                sell_level = self.grid_levels[sell_price]
+
+                if sell_level and sell_level.can_place_sell_order():
+                    self.logger.debug(f"Skipping sell level {sell_price} - already has a pending sell order.")
+                    continue
+
+                if sell_price > buy_grid_level.price:
+                    self.logger.info(f"Paired sell level found at {sell_price} for buy level {buy_grid_level.price}.")
+                    return sell_level
+
+            self.logger.warning(f"No paired sell level found for buy level {buy_grid_level.price}.")
+            return None
+    
+        elif self.strategy_type == StrategyType.HEDGED_GRID:
+            sorted_prices = sorted(self.price_grids)
+            current_index = sorted_prices.index(buy_grid_level.price)
+
+            if current_index + 1 < len(sorted_prices):
+                paired_sell_price = sorted_prices[current_index + 1]
+                return self.grid_levels[paired_sell_price]
+            return None
+
+        else:
+            self.logger.error(f"Unsupported strategy type: {self.strategy_type}")
+            return None
     
     def mark_buy_order_pending(self, grid_level: GridLevel, order: Order) -> None:
         """

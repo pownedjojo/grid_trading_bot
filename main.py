@@ -23,10 +23,10 @@ def initialize_config(config_path: str) -> ConfigManager:
         logging.error(f"An error occured during the initialization of ConfigManager {e}")
         exit(1)
 
-def initialize_notification_handler(config_manager: ConfigManager) -> NotificationHandler:
+def initialize_notification_handler(config_manager: ConfigManager, event_bus: EventBus) -> NotificationHandler:
     notification_urls = os.getenv("APPRISE_NOTIFICATION_URLS", "").split(",")
     trading_mode = config_manager.get_trading_mode()
-    return NotificationHandler(notification_urls, trading_mode)
+    return NotificationHandler(event_bus, notification_urls, trading_mode)
 
 async def run_bot(
     config_path: str,
@@ -37,7 +37,7 @@ async def run_bot(
     config_manager = initialize_config(config_path)
     setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_filename())
     event_bus = EventBus()
-    notification_handler = initialize_notification_handler(config_manager)
+    notification_handler = initialize_notification_handler(config_manager, event_bus)
     bot = GridTradingBot(config_path, config_manager, notification_handler, event_bus, save_performance_results_path, no_plot)
     bot_controller = BotController(bot, event_bus)
     health_check = HealthCheck(bot, notification_handler, event_bus)

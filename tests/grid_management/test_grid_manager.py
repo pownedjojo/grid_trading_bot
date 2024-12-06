@@ -164,42 +164,13 @@ class TestGridManager:
 
         crossed_grid_level = grid_manager.get_crossed_grid_level(current_price, previous_price, sell=True)
         assert crossed_grid_level.price == 1600
-
-
-    def test_detect_exact_downward_crossing(self, grid_manager):
-        grid_manager.grid_levels = {
-            1300: Mock(spec=GridLevel, price=1300),
-            1400: Mock(spec=GridLevel, price=1400),
-            1500: Mock(spec=GridLevel, price=1500)
-        }
-        grid_manager.sorted_buy_grids = [1300, 1400, 1500]
-
-        current_price = 1450
-        previous_price = 1500
-
-        crossed_grid_level = grid_manager.get_crossed_grid_level(current_price, previous_price)
-        assert crossed_grid_level.price == 1500
-
-    def test_find_lowest_completed_buy_grid(self, grid_manager):
-        grid_manager.initialize_grids_and_levels()
-        mock_grid_level = Mock()
-        mock_grid_level.can_place_sell_order.return_value = True
-        grid_manager.grid_levels[1000] = mock_grid_level
-
-        lowest_completed_grid = grid_manager.find_lowest_completed_buy_grid()
-        assert lowest_completed_grid == mock_grid_level
-
-    def test_find_lowest_completed_buy_grid_no_completed(self, grid_manager):
-        grid_manager.initialize_grids_and_levels()
-        lowest_completed_grid = grid_manager.find_lowest_completed_buy_grid()
-        assert lowest_completed_grid is None
     
     def test_get_order_size_per_grid(self, grid_manager):
         grid_manager.grid_levels = [1, 2, 3, 4, 5]
         grid_manager.initial_balance = 10000
         current_price = 200
         expected_order_size = 10000 / len(grid_manager.grid_levels) / current_price
-        result = grid_manager.get_order_size_per_grid(current_price)
+        result = grid_manager.get_order_size_for_grid_level(current_price)
         assert result == expected_order_size
     
     import pytest

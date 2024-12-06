@@ -13,10 +13,10 @@ class Plotter:
 
     def plot_results(self, data: pd.DataFrame) -> None:
         fig = make_subplots(
-            rows=2,
+            rows=3,
             cols=1,
             shared_xaxes=True,
-            row_heights=[0.85, 0.15],
+            row_heights=[0.70, 0.15, 0.15],
             vertical_spacing=0.03
         )
 
@@ -25,10 +25,13 @@ class Plotter:
         self._add_trade_markers(fig, self.order_book.get_completed_orders())
         self._add_volume_trace(fig, data)
 
+        self._add_account_value_trace(fig, data)
+
         fig.update_layout(
             title="Grid Trading Strategy Results",
             yaxis_title="Price (USDT)",
             yaxis2_title="Volume",
+            yaxis3_title="P/L",
             xaxis=dict(rangeslider=dict(visible=False)),
             showlegend=False,
         )
@@ -77,8 +80,7 @@ class Plotter:
                     text=f"Price: {order.price}\nQty: {order.filled}\nDate: {order.format_last_trade_timestamp()}",
                     hoverinfo='x+y+text',
                 ),
-                row=1, 
-                col=1
+                row=1, col=1
             )
 
     def _add_volume_trace(self, fig: go.Figure, data: pd.DataFrame) -> None:
@@ -99,4 +101,16 @@ class Plotter:
             title="Volume",
             row=2, col=1,
             gridcolor="lightgray",
+        )
+    
+    def _add_account_value_trace(self, fig: go.Figure, data: pd.DataFrame) -> None:
+        fig.add_trace(
+            go.Scatter(
+                x=data.index,
+                y=data['account_value'],
+                mode='lines',
+                name="Account Value",
+                line=dict(color='purple', width=2),
+            ),
+            row=3, col=1
         )

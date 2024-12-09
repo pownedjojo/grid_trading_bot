@@ -47,7 +47,7 @@ class EventBus:
         if event_type in self.subscribers and callback in self.subscribers[event_type]:
             self.subscribers[event_type].remove(callback)
             self.logger.info(f"Callback unsubscribed from event: {event_type}")
-            # Remove the event type if no callbacks are left
+
             if not self.subscribers[event_type]:
                 del self.subscribers[event_type]
         else:
@@ -74,12 +74,23 @@ class EventBus:
         if event_type in self.subscribers:
             self.logger.info(f"Publishing async event: {event_type} with data: {data}")
             tasks = []
+
             for callback in self.subscribers[event_type]:
-                if asyncio.iscoroutinefunction(callback):
-                    tasks.append(self._safe_invoke_async(callback, data))
-                else:
-                    tasks.append(self._safe_invoke_sync(callback, data))
-            await asyncio.gather(*tasks, return_exceptions=True)
+                try:
+                    if asyncio.iscoroutinefunction(callback):
+                        self.logger.info(f"Detected async function: {callback}")
+                        tasks.append(self._safe_invoke_async(callback, data))
+                    elif asyncio.iscoroutine(callback):
+                        self.logger.info(f"Detected coroutine object: {callback}")
+                        tasks.append(callback)
+                    else:
+                        self.logger.info(f"Detected sync function: {callback}")
+                        tasks.append(asyncio.to_thread(self._safe_invoke_sync, callback, data))
+                except Exception as e:
+                    self.logger.error(f"Error preparing callback {callback}: {e}", exc_info=True)
+
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
     def publish_sync(self, event_type: str, data: Any) -> None:
         """
@@ -102,6 +113,7 @@ class EventBus:
         Safely invokes an async callback, suppressing and logging any exceptions.
         """
         try:
+            self.logger.info(f"Executing async callback: {callback}")
             await callback(data)
         except Exception as e:
             self.logger.error(f"Error in async subscriber callback: {e}", exc_info=True)

@@ -98,10 +98,12 @@ class TradingPerformanceAnalyzer:
         sell_orders_with_grid = self.order_book.get_sell_orders_with_grid()
 
         for buy_order, grid_level in buy_orders_with_grid:
-            orders.append(self._format_order(buy_order, grid_level))
+            if buy_order.is_filled():
+                orders.append(self._format_order(buy_order, grid_level))
 
         for sell_order, grid_level in sell_orders_with_grid:
-            orders.append(self._format_order(sell_order, grid_level))
+            if sell_order.is_filled():
+                orders.append(self._format_order(sell_order, grid_level))
         
         orders.sort(key=lambda x: (x[5] is None, x[5]))  # x[5] is the timestamp, sort None to the end
         return orders
@@ -122,8 +124,8 @@ class TradingPerformanceAnalyzer:
         ]
     
     def _calculate_trade_counts(self) -> Tuple[int, int]:
-        num_buy_trades = len(self.order_book.get_all_buy_orders())
-        num_sell_trades = len(self.order_book.get_all_sell_orders())
+        num_buy_trades = len([order for order in self.order_book.get_all_buy_orders() if order.is_filled()])
+        num_sell_trades = len([order for order in self.order_book.get_all_sell_orders() if order.is_filled()])
         return num_buy_trades, num_sell_trades
     
     def _calculate_buy_and_hold_return(self, data: pd.DataFrame, final_price: float) -> float:

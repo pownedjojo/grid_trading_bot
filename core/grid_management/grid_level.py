@@ -13,39 +13,34 @@ class GridLevel:
         self.price: float = price
         self.buy_orders: List[Order] = []  # Track all buy orders at this level
         self.sell_orders: List[Order] = []  # Track all sell orders at this level
-        self.pending_buy_order: Optional[Order] = None  # The currently pending buy order, if any
-        self.pending_sell_order: Optional[Order] = None  # The currently pending sell order, if any
         self.state: GridCycleState = state
+        self.paired_grid_level: Optional['GridLevel'] = None  # Dynamically assigned pairing
 
     def place_buy_order(self, buy_order: Order) -> None:
         """
         Record a buy order at this level and update state.
         """
         self.buy_orders.append(buy_order)
-        self.pending_buy_order = buy_order
         self.state = GridCycleState.WAITING_FOR_BUY_FILL
 
     def complete_buy_order(self) -> None:
         """
-        Mark the pending buy order as filled and prepare for the sell order.
+        Reset the cycle.
         """
-        self.pending_buy_order = None
-        self.state = GridCycleState.READY_TO_SELL
+        self.state = GridCycleState.READY_TO_BUY
 
     def place_sell_order(self, sell_order: Order) -> None:
         """
         Record a sell order at this level and update state.
         """
         self.sell_orders.append(sell_order)
-        self.pending_sell_order = sell_order
         self.state = GridCycleState.WAITING_FOR_SELL_FILL
 
     def complete_sell_order(self) -> None:
         """
-        Mark the pending sell order as filled and reset the cycle.
+        Reset the cycle.
         """
-        self.pending_sell_order = None
-        self.state = GridCycleState.READY_TO_BUY
+        self.state = GridCycleState.READY_TO_SELL
 
     def can_place_buy_order(self) -> bool:
         """
@@ -67,10 +62,9 @@ class GridLevel:
             f"state={self.state.name}, "
             f"num_buy_orders={len(self.buy_orders)}, "
             f"num_sell_orders={len(self.sell_orders)}, "
-            f"pending_buy_order={self.pending_buy_order}, "
-            f"pending_sell_order={self.pending_sell_order}, "
             f"latest_buy_order={latest_buy_order}, "
             f"latest_sell_order={latest_sell_order})"
+            f"paired_grid_level={self.paired_grid_level.price if self.paired_grid_level else None})"
         )
 
     def __repr__(self) -> str:

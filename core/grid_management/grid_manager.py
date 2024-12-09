@@ -19,6 +19,19 @@ class GridManager:
         self.grid_levels: dict[float, GridLevel] = {}
     
     def initialize_grids_and_levels(self) -> None:
+        """
+        Initializes the grid levels and assigns their respective states based on the chosen strategy.
+
+        For the `SIMPLE_GRID` strategy:
+        - Buy orders are placed on grid levels below the central price.
+        - Sell orders are placed on grid levels above the central price.
+        - Levels are initialized with `READY_TO_BUY` or `READY_TO_SELL` states.
+
+        For the `HEDGED_GRID` strategy:
+        - Grid levels are divided into buy levels (all except the top grid) and sell levels (all except the bottom grid).
+        - Buy grid levels are initialized with `READY_TO_BUY`, except for the topmost grid.
+        - Sell grid levels are initialized with `READY_TO_SELL`.
+        """
         self.price_grids, self.central_price = self._calculate_price_grids_and_central_price()
 
         if self.strategy_type == StrategyType.SIMPLE_GRID:
@@ -42,11 +55,64 @@ class GridManager:
         self,
         current_price: float
     ) -> float:
+        """
+        Calculates the order size for a grid level based on the initial balance, total grids, and current price.
+
+        The order size is determined by evenly distributing the initial balance across all grid levels and adjusting 
+        it to reflect the current price.
+
+        Args:
+            current_price: The current price of the trading pair.
+
+        Returns:
+            The calculated order size as a float.
+        """
         total_grids = len(self.grid_levels)
         order_size = self.initial_balance / total_grids / current_price
         return order_size
+
+    def pair_grid_levels(
+        self, 
+        buy_grid_level: GridLevel, 
+        sell_grid_level: GridLevel
+    ):
+        """
+        Dynamically pairs a buy grid level with a sell grid level.
+        This method ensures that grid levels are paired correctly, updating their `paired_grid_level` attributes.
+
+        Args:
+            buy_grid_level: The `GridLevel` object representing the buy grid level.
+            sell_grid_level: The `GridLevel` object representing the sell grid level.
+        """
+        if buy_grid_level.paired_grid_level or sell_grid_level.paired_grid_level:
+            raise ValueError(f"Grid levels {buy_grid_level} or {sell_grid_level} are already paired.")
+
+        buy_grid_level.paired_grid_level = sell_grid_level
+        sell_grid_level.paired_grid_level = buy_grid_level
+        self.logger.info(f"Paired buy level {buy_grid_level.price} with sell level {sell_grid_level.price}.")
     
-    def get_paired_sell_level(self, buy_grid_level: GridLevel) -> Optional[GridLevel]:
+    def unpair_grid_levels(
+        self, 
+        buy_grid_level: GridLevel, 
+        sell_grid_level: GridLevel
+    ):
+        """
+        Removes the pairing between a buy grid level and a sell grid level.
+        This method resets the `paired_grid_level` attribute for both grid levels, allowing them to be re-paired 
+        dynamically if needed.
+
+        Args:
+            buy_grid_level: The `GridLevel` object representing the buy grid level.
+            sell_grid_level: The `GridLevel` object representing the sell grid level.
+        """
+        buy_grid_level.paired_grid_level = None
+        sell_grid_level.paired_grid_level = None
+        self.logger.info(f"Unpaired buy level {buy_grid_level.price} with sell level {sell_grid_level.price}.")
+
+    def get_paired_sell_level(
+        self, 
+        buy_grid_level: GridLevel
+    ) -> Optional[GridLevel]:
         """
         Determines the paired sell level for a given buy grid level based on the strategy type.
 
@@ -60,7 +126,7 @@ class GridManager:
             for sell_price in self.sorted_sell_grids:
                 sell_level = self.grid_levels[sell_price]
 
-                if sell_level and sell_level.can_place_sell_order():
+                if sell_level and not sell_level.can_place_sell_order():
                     self.logger.debug(f"Skipping sell level {sell_price} - already has a pending sell order.")
                     continue
 
@@ -84,7 +150,11 @@ class GridManager:
             self.logger.error(f"Unsupported strategy type: {self.strategy_type}")
             return None
     
-    def mark_buy_order_pending(self, grid_level: GridLevel, order: Order) -> None:
+    def mark_buy_order_pending(
+        self, 
+        grid_level: GridLevel, 
+        order: Order
+    ) -> None:
         """
         Marks a grid level as having a pending buy order.
 
@@ -95,7 +165,11 @@ class GridManager:
         grid_level.place_buy_order(order)
         self.logger.info(f"Buy order placed and marked as pending at grid level {grid_level.price}.")
 
-    def mark_sell_order_pending(self, grid_level: GridLevel, order: Order) -> None:
+    def mark_sell_order_pending(
+        self, 
+        grid_level: GridLevel, 
+        order: Order
+    ) -> None:
         """
         Marks a grid level as having a pending sell order.
 

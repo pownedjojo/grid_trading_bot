@@ -72,7 +72,10 @@ class OrderManager:
                     self.logger.error(f"Unexpected error during buy order initialization at grid level {price}: {e}", exc_info=True)
                     await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place order: {e}")
 
-    async def _on_order_completed(self, order: Order) -> None:
+    async def _on_order_completed(
+        self, 
+        order: Order
+    ) -> None:
         """
         Handles completed orders and places paired orders as needed.
 
@@ -123,6 +126,8 @@ class OrderManager:
                 sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, order.filled, paired_sell_level.price)
 
                 if sell_order:
+                    self.grid_manager.pair_grid_levels(grid_level, paired_sell_level)
+                    self.balance_tracker.reserve_funds_for_sell(sell_order.amount)
                     self.grid_manager.mark_sell_order_pending(paired_sell_level, sell_order)
                     self.order_book.add_order(sell_order, paired_sell_level)
                 else:
@@ -131,6 +136,19 @@ class OrderManager:
         elif order.side == OrderSide.SELL:
             self.logger.info(f"Sell order completed at grid level {grid_level.price}.")
             self.grid_manager.complete_sell_order(grid_level)
+            paired_buy_level = grid_level.paired_grid_level
+
+            if paired_buy_level is None or not paired_buy_level.can_place_buy_order():
+                self.logger.error(f"No paired buy grid level for grid_level: {grid_level} - unable to place limit buy order.")
+                return
+
+            self.logger.info(f"Placing Buy limit order at grid level {paired_buy_level.price} for {order.amount} {self.pair}.")
+            self.transaction_validator.validate_buy_order(self.balance_tracker.balance, order.amount, paired_buy_level.price, paired_buy_level)
+            order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, order.amount, paired_buy_level.price)
+            self.balance_tracker.reserve_funds_for_buy(order.amount * paired_buy_level.price)
+            self.grid_manager.mark_buy_order_pending(grid_level, order)
+            self.order_book.add_order(order, paired_buy_level)
+            self.grid_manager.unpair_grid_levels(buy_grid_level=paired_buy_level, sell_grid_level=grid_level)
 
     async def _handle_hedged_grid_order_completion(
         self, 
@@ -234,28 +252,50 @@ class OrderManager:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
             await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place {event} order: {e}")
     
-    def simulate_order_fills(
+    async def simulate_order_fills(
         self, 
         high_price: float, 
         low_price: float, 
         timestamp: Union[int, pd.Timestamp]
     ) -> None:
         """
-        Simulates the execution of limit orders based on the high and low prices of the current step.
+        Simulates the execution of limit orders based on crossed grid levels within the high-low price range.
 
         Args:
             high_price: The highest price reached in this time interval.
             low_price: The lowest price reached in this time interval.
             timestamp: The current timestamp in the backtest simulation.
         """
+        timestamp_val = int(timestamp.timestamp()) if isinstance(timestamp, pd.Timestamp) else int(timestamp)
         pending_orders = self.order_book.get_open_orders()
+        crossed_buy_levels = [level for level in self.grid_manager.sorted_buy_grids if low_price <= level <= high_price]
+        crossed_sell_levels = [level for level in self.grid_manager.sorted_sell_grids if low_price <= level <= high_price]
+
+        self.logger.debug(f"Simulating fills: High {high_price}, Low {low_price}, Pending orders: {len(pending_orders)}")
+        self.logger.debug(f"Crossed buy levels: {crossed_buy_levels}, Crossed sell levels: {crossed_sell_levels}")
 
         for order in pending_orders:
-            if (order.side == OrderSide.BUY and order.price >= low_price) or (order.side == OrderSide.SELL and order.price <= high_price):
-                order.filled = order.amount
-                order.remaining = 0.0
-                order.status = OrderStatus.CLOSED
-                order.last_trade_timestamp = int(timestamp.timestamp())
+            if order.side == OrderSide.BUY and order.price in crossed_buy_levels:
+                await self._simulate_fill(order, timestamp_val)
 
-                self.logger.info(f"Simulated fill for {order.side.value.upper()} order at price {order.price} with amount {order.amount}. Filled at timestamp {timestamp}")
-                self.event_bus.publish_sync(Events.ORDER_COMPLETED, order)
+            elif order.side == OrderSide.SELL and order.price in crossed_sell_levels:
+                await self._simulate_fill(order, timestamp_val)
+
+    async def _simulate_fill(
+        self, 
+        order: Order, 
+        timestamp: int
+    ) -> None:
+        """
+        Simulates filling an order by marking it as completed and publishing an event.
+
+        Args:
+            order: The order to simulate a fill for.
+            timestamp: The timestamp at which the order is filled.
+        """
+        order.filled = order.amount
+        order.remaining = 0.0
+        order.status = OrderStatus.CLOSED
+        order.last_trade_timestamp = timestamp
+        self.logger.info(f"Simulated fill for {order.side.value.upper()} order at price {order.price} with amount {order.amount}. Filled at timestamp {timestamp}")
+        await self.event_bus.publish(Events.ORDER_COMPLETED, order)

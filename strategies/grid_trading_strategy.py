@@ -109,11 +109,10 @@ class GridTradingStrategy(TradingStrategy):
         self.high_prices = self.data['high'].values
         self.low_prices = self.data['low'].values
         timestamps = self.data.index
-        initial_price = self.close_prices[0]
         self.data.loc[timestamps[0], 'account_value'] = self.config_manager.get_initial_balance()
 
         for i, (current_price, high_price, low_price, timestamp) in enumerate(zip(self.close_prices, self.high_prices, self.low_prices, timestamps)):
-            self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
+            await self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
 
             if await self._check_take_profit_stop_loss(current_price):
                 break

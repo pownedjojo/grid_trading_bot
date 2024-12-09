@@ -22,7 +22,7 @@ class BalanceTracker:
         self.reserved_crypto = 0.0
         self.event_bus.subscribe(Events.ORDER_COMPLETED, self._update_balance_on_order_completion)
 
-    def _update_balance_on_order_completion(self, order: Order) -> None:
+    async def _update_balance_on_order_completion(self, order: Order) -> None:
         """
         Updates the account balance and crypto balance when an order is completed.
 
@@ -63,7 +63,6 @@ class BalanceTracker:
             self.balance += self.reserved_fiat  # Adjust with excess reserved fiat
             self.reserved_fiat = 0
     
-        self.balance -= total_cost
         self.crypto_balance += quantity
         self.total_fees += fee
         self.logger.info(f"Buy order completed: {quantity} crypto purchased at {price}.")

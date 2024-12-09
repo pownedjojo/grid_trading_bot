@@ -17,7 +17,7 @@ class Plotter:
             cols=1,
             shared_xaxes=True,
             row_heights=[0.70, 0.15, 0.15],
-            vertical_spacing=0.03
+            vertical_spacing=0.02
         )
 
         self._add_candlestick_trace(fig, data)
@@ -31,7 +31,7 @@ class Plotter:
             title="Grid Trading Strategy Results",
             yaxis_title="Price (USDT)",
             yaxis2_title="Volume",
-            yaxis3_title="P/L",
+            yaxis3_title="Equity",
             xaxis=dict(rangeslider=dict(visible=False)),
             showlegend=False,
         )
@@ -45,7 +45,7 @@ class Plotter:
                 high=data['high'],
                 low=data['low'],
                 close=data['close'],
-                name="Candlesticks",
+                name=""
             ),
             row=1, col=1
         )
@@ -90,17 +90,16 @@ class Plotter:
             go.Bar(
                 x=data.index,
                 y=data['volume'],
-                name="Volume",
                 marker=dict(color=volume_colors),
-                opacity=0.7,
+                name=""
             ),
             row=2, col=1
         )
         
         fig.update_yaxes(
             title="Volume",
-            row=2, col=1,
-            gridcolor="lightgray",
+            row=2,
+            col=1
         )
     
     def _add_account_value_trace(self, fig: go.Figure, data: pd.DataFrame) -> None:
@@ -109,7 +108,7 @@ class Plotter:
                 x=data.index,
                 y=data['account_value'],
                 mode='lines',
-                name="Account Value",
+                name="",
                 line=dict(color='purple', width=2),
             ),
             row=3, col=1

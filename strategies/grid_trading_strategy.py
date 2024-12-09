@@ -1,10 +1,9 @@
-import logging, itertools
-from typing import Optional, Tuple, Union
+import logging
+from typing import Optional, Tuple
 import pandas as pd
 import numpy as np
 from .base import TradingStrategy
 from config.trading_mode import TradingMode
-from core.order_handling.order import OrderSide
 from core.bot_management.event_bus import EventBus, Events
 from config.config_manager import ConfigManager
 from core.services.exchange_interface import ExchangeInterface
@@ -111,22 +110,22 @@ class GridTradingStrategy(TradingStrategy):
         self.low_prices = self.data['low'].values
         timestamps = self.data.index
         initial_price = self.close_prices[0]
-        self.data.loc[timestamps[0], 'account_value'] = await self.balance_tracker.get_total_balance_value(initial_price)
+        self.data.loc[timestamps[0], 'account_value'] = self.config_manager.get_initial_balance()
 
         for i, (current_price, high_price, low_price, timestamp) in enumerate(zip(self.close_prices, self.high_prices, self.low_prices, timestamps)):
-            await self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
+            self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
 
             if await self._check_take_profit_stop_loss(current_price):
                 break
 
-            self.data.loc[timestamp, 'account_value'] = await self.balance_tracker.get_total_balance_value(current_price)
+            self.data.loc[timestamp, 'account_value'] = self.balance_tracker.get_total_balance_value(current_price)
 
     def generate_performance_report(self) -> Tuple[dict, list]:
         final_price = self.close_prices[-1]
         return self.trading_performance_analyzer.generate_performance_summary(
             self.data, 
-            self.balance_tracker.balance, 
-            self.balance_tracker.crypto_balance, 
+            self.balance_tracker.get_adjusted_fiat_balance(), 
+            self.balance_tracker.get_adjusted_crypto_balance(), 
             final_price,
             self.balance_tracker.total_fees
         )

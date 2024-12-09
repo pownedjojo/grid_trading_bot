@@ -97,7 +97,7 @@ class GridTradingBot:
             self.strategy.initialize_strategy()
             await self.strategy.run()
 
-            if self.trading_mode == TradingMode.BACKTEST and not self.no_plot:
+            if not self.no_plot:
                 self.strategy.plot_results()
 
             if self.trading_mode == TradingMode.BACKTEST:

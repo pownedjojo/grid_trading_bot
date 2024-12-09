@@ -29,23 +29,31 @@ class TradingPerformanceAnalyzer:
         return round(roi, 2)
     
     def _calculate_trading_gains(self) -> str:
-        total_buy_cost = 0
-        total_sell_revenue = 0
-        buy_orders = self.order_book.get_all_buy_orders()
-        sell_orders = self.order_book.get_all_sell_orders()
+        """
+        Calculates the total trading gains from completed buy and sell orders.
 
-        for buy_order in buy_orders:
+        The computation uses only closed orders to determine the net profit or loss 
+        from executed trades.
+
+        Returns:
+            str: The total grid trading gains as a formatted string, or "N/A" if there are no sell orders.
+        """
+        total_buy_cost = 0.0
+        total_sell_revenue = 0.0
+        closed_buy_orders = [order for order in self.order_book.get_all_buy_orders() if order.is_filled()]
+        closed_sell_orders = [order for order in self.order_book.get_all_sell_orders() if order.is_filled()]
+
+        for buy_order in closed_buy_orders:
             trade_value = buy_order.amount * buy_order.price
-            buy_fee = trade_value * self.trading_fee
+            buy_fee = buy_order.fee.get('cost', 0.0) if buy_order.fee else 0.0
             total_buy_cost += trade_value + buy_fee
 
-        for sell_order in sell_orders:
+        for sell_order in closed_sell_orders:
             trade_value = sell_order.amount * sell_order.price
-            sell_fee = trade_value * self.trading_fee
+            sell_fee = sell_order.fee.get('cost', 0.0) if sell_order.fee else 0.0
             total_sell_revenue += trade_value - sell_fee
-
-        grid_trading_gains = f"{total_sell_revenue - total_buy_cost:.2f}" if total_sell_revenue != 0 else "N/A"
-        return grid_trading_gains
+        
+        return "N/A" if total_sell_revenue == 0 else f"{total_sell_revenue - total_buy_cost:.2f}"
 
     def _calculate_drawdown(self, data: pd.DataFrame) -> float:
         peak = data['account_value'].expanding(min_periods=1).max()
@@ -125,8 +133,8 @@ class TradingPerformanceAnalyzer:
     def generate_performance_summary(
         self, 
         data: pd.DataFrame, 
-        balance: float, 
-        crypto_balance: float, 
+        final_fiat_balance: float, 
+        final_crypto_balance: float, 
         final_crypto_price: float, 
         total_fees: float
     ) -> Tuple[Dict[str, Any], List[List[Union[str, float]]]]:
@@ -134,8 +142,7 @@ class TradingPerformanceAnalyzer:
         start_date = data.index[0]
         end_date = data.index[-1]
         duration = end_date - start_date
-        final_fiat_balance = balance
-        final_crypto_value = crypto_balance * final_crypto_price
+        final_crypto_value = final_crypto_balance * final_crypto_price
         final_balance = final_fiat_balance + final_crypto_value
         roi = self._calculate_roi(final_balance)
         grid_trading_gains = self._calculate_trading_gains()
@@ -161,7 +168,7 @@ class TradingPerformanceAnalyzer:
             "Grid Trading Gains": f"{grid_trading_gains}",
             "Total Fees": f"{total_fees:.2f}",
             "Final Balance (Fiat)": f"{final_balance:.2f}",
-            "Final Crypto Balance": f"{crypto_balance:.4f} {self.base_currency}",
+            "Final Crypto Balance": f"{final_crypto_balance:.4f} {self.base_currency}",
             "Final Crypto Value (Fiat)": f"{final_crypto_value:.2f} {self.quote_currency}",
             "Remaining Fiat Balance": f"{final_fiat_balance:.2f} {self.quote_currency}",
             "Number of Buy Trades": num_buy_trades,

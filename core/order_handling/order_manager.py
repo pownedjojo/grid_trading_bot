@@ -234,7 +234,7 @@ class OrderManager:
             self.logger.error(f"Failed to execute {event} sell order at {current_price}: {e}")
             await self.notification_handler.async_send_notification(NotificationType.ERROR_OCCURRED, error_details=f"Failed to place {event} order: {e}")
     
-    async def simulate_order_fills(
+    def simulate_order_fills(
         self, 
         high_price: float, 
         low_price: float, 
@@ -258,4 +258,4 @@ class OrderManager:
                 order.last_trade_timestamp = int(timestamp.timestamp())
 
                 self.logger.info(f"Simulated fill for {order.side.value.upper()} order at price {order.price} with amount {order.amount}. Filled at timestamp {timestamp}")
-                await self.event_bus.publish(Events.ORDER_COMPLETED, order)
+                self.event_bus.publish_sync(Events.ORDER_COMPLETED, order)

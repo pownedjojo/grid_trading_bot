@@ -4,7 +4,7 @@ import numpy as np
 from strategies.strategy_type import StrategyType
 from strategies.spacing_type import SpacingType
 from .grid_level import GridLevel, GridCycleState
-from ..order_handling.order import Order
+from ..order_handling.order import Order, OrderSide
 
 class GridManager:
     def __init__(self, config_manager):
@@ -45,7 +45,7 @@ class GridManager:
             self.grid_levels = {
                 price: GridLevel(
                     price,
-                    GridCycleState.READY_TO_BUY if price != self.price_grids[-1] else GridCycleState.READY_TO_SELL
+                    GridCycleState.READY_TO_BUY_OR_SELL if price != self.price_grids[-1] else GridCycleState.READY_TO_SELL
                 )
                 for price in self.price_grids
             }
@@ -126,7 +126,7 @@ class GridManager:
             for sell_price in self.sorted_sell_grids:
                 sell_level = self.grid_levels[sell_price]
 
-                if sell_level and not sell_level.can_place_sell_order():
+                if sell_level and not self.can_place_order(sell_level, OrderSide.SELL):
                     self.logger.debug(f"Skipping sell level {sell_price} - already has a pending sell order.")
                     continue
 
@@ -150,55 +150,100 @@ class GridManager:
             self.logger.error(f"Unsupported strategy type: {self.strategy_type}")
             return None
     
-    def mark_buy_order_pending(
+    def mark_order_pending(
         self, 
         grid_level: GridLevel, 
         order: Order
     ) -> None:
         """
-        Marks a grid level as having a pending buy order.
+        Marks a grid level as having a pending order (buy or sell).
 
         Args:
             grid_level: The grid level to update.
-            order: The Order object representing the pending buy order.
+            order: The Order object representing the pending order.
+            order_side: The side of the order (buy or sell).
         """
-        grid_level.place_buy_order(order)
-        self.logger.info(f"Buy order placed and marked as pending at grid level {grid_level.price}.")
+        grid_level.add_order(order)
+        
+        if order.side == OrderSide.BUY:
+            grid_level.state = GridCycleState.WAITING_FOR_BUY_FILL
+            self.logger.info(f"Buy order placed and marked as pending at grid level {grid_level.price}.")
+        elif order.side == OrderSide.SELL:
+            grid_level.state = GridCycleState.WAITING_FOR_SELL_FILL
+            self.logger.info(f"Sell order placed and marked as pending at grid level {grid_level.price}.")
 
-    def mark_sell_order_pending(
+    def complete_order(
         self, 
         grid_level: GridLevel, 
-        order: Order
+        order_side: OrderSide
     ) -> None:
         """
-        Marks a grid level as having a pending sell order.
+        Marks the completion of an order (buy or sell) and transitions the grid level.
 
         Args:
-            grid_level: The grid level to update.
-            order: The Order object representing the pending sell order.
+            grid_level: The grid level where the order was completed.
+            order_side: The side of the completed order (buy or sell).
         """
-        grid_level.place_sell_order(order)
-        self.logger.info(f"Sell order placed and marked as pending at grid level {grid_level.price}.")
+        if self.strategy_type == StrategyType.SIMPLE_GRID:
+            if order_side == OrderSide.BUY:
+                grid_level.state = GridCycleState.READY_TO_SELL
+                self.logger.info(f"Buy order completed at grid level {grid_level.price}. Transitioning to READY_TO_SELL.")
+            elif order_side == OrderSide.SELL:
+                grid_level.state = GridCycleState.READY_TO_BUY
+                self.logger.info(f"Sell order completed at grid level {grid_level.price}. Transitioning to READY_TO_BUY.")
+        
+        elif self.strategy_type == StrategyType.HEDGED_GRID:
+            if order_side == OrderSide.BUY:
+                grid_level.state = GridCycleState.READY_TO_BUY_OR_SELL
+                self.logger.info(f"Buy order completed at grid level {grid_level.price}. Transitioning to READY_TO_BUY_OR_SELL.")
+            
+                # Transition the paired buy level to "READY_TO_SELL"
+                if grid_level.paired_grid_level:
+                    grid_level.paired_grid_level.state = GridCycleState.READY_TO_SELL
+                    self.logger.info(f"Paired sell grid level {grid_level.paired_grid_level.price} transitioned to READY_TO_SELL.")
+
+            elif order_side == OrderSide.SELL:
+                grid_level.state = GridCycleState.READY_TO_BUY_OR_SELL
+                self.logger.info(f"Sell order completed at grid level {grid_level.price}. Transitioning to READY_TO_BUY_OR_SELL.")
+
+                # Transition the paired buy level to "READY_TO_BUY"
+                if grid_level.paired_grid_level:
+                    grid_level.paired_grid_level.state = GridCycleState.READY_TO_BUY
+                    self.logger.info(f"Paired buy grid level {grid_level.paired_grid_level.price} transitioned to READY_TO_BUY.")
+
+        else:
+            self.logger.error("Unexpected strategy type")
+
     
-    def complete_buy_order(self, grid_level: GridLevel) -> None:
+    def can_place_order(
+        self, 
+        grid_level: GridLevel, 
+        order_side: OrderSide, 
+    ) -> bool:
         """
-        Marks the pending buy order as filled and transitions the grid level to READY_TO_SELL.
+        Determines if an order can be placed on the given grid level for the current strategy.
 
         Args:
-            grid_level: The grid level where the buy order was completed.
-        """
-        grid_level.complete_buy_order()
-        self.logger.info(f"Buy order completed at grid level {grid_level.price}.")
-    
-    def complete_sell_order(self, grid_level: GridLevel) -> None:
-        """
-        Marks the pending sell order as filled and resets the grid level.
+            grid_level: The grid level being evaluated.
+            order_side: The side of the order (buy or sell).
 
-        Args:
-            grid_level: The grid level where the sell order was completed.
+        Returns:
+            bool: True if the order can be placed, False otherwise.
         """
-        grid_level.complete_sell_order()
-        self.logger.info(f"Sell order completed and grid level reset at {grid_level.price}.")
+        if self.strategy_type == StrategyType.SIMPLE_GRID:
+            if order_side == OrderSide.BUY:
+                return grid_level.state == GridCycleState.READY_TO_BUY
+            elif order_side == OrderSide.SELL:
+                return grid_level.state == GridCycleState.READY_TO_SELL
+
+        elif self.strategy_type == StrategyType.HEDGED_GRID:
+            if order_side == OrderSide.BUY:
+                return grid_level.state in {GridCycleState.READY_TO_BUY, GridCycleState.READY_TO_BUY_OR_SELL}
+            elif order_side == OrderSide.SELL:
+                return grid_level.state in {GridCycleState.READY_TO_SELL, GridCycleState.READY_TO_BUY_OR_SELL}
+
+        else:
+            return False
 
     def _extract_grid_config(self) -> Tuple[float, float, int, str]:
         """

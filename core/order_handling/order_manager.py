@@ -40,28 +40,33 @@ class OrderManager:
         self.strategy_type: StrategyType = self.config_manager.get_strategy_type()
         self.event_bus.subscribe(Events.ORDER_COMPLETED, self._on_order_completed)
     
-    async def initialize_grid_orders(self):
+    async def initialize_grid_orders(
+        self, 
+        current_price: float
+    ):
         """
         Places initial buy orders for grid levels below the current price.
         """
         for price in self.grid_manager.sorted_buy_grids:
+            if price >= current_price:
+                self.logger.warning(f"Skipping grid level at price: {price} for BUY order: Above current price.")
+                continue
+
             grid_level = self.grid_manager.grid_levels[price]
 
-            if grid_level.can_place_buy_order():
+            if self.grid_manager.can_place_order(grid_level, OrderSide.BUY):
                 try:
                     order_quantity = self.grid_manager.get_order_size_for_grid_level(price)
                     self.logger.info(f"Placing initial buy limit order at grid level {price} for {order_quantity} {self.pair}.")
-
                     self.transaction_validator.validate_buy_order(self.balance_tracker.balance, order_quantity, price, grid_level)
-                    self.balance_tracker.reserve_funds_for_buy(order_quantity * price)
-
                     order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, order_quantity, price)
 
                     if order is None:
                         self.logger.error(f"Failed to place buy order at {price}: No order returned.")
                         continue
 
-                    self.grid_manager.mark_buy_order_pending(grid_level, order)
+                    self.balance_tracker.reserve_funds_for_buy(order_quantity * price)
+                    self.grid_manager.mark_order_pending(grid_level, order)
                     self.order_book.add_order(order, grid_level)
 
                 except OrderExecutionFailedError as e:
@@ -86,15 +91,10 @@ class OrderManager:
             grid_level = self.order_book.get_grid_level_for_order(order)
 
             if not grid_level:
-                self.logger.warning(f"No grid level found for completed order {order.identifier}.")
+                self.logger.warning(f"Could not handle Order completion - No grid level found for the given completed order {order}")
                 return
 
-            if self.strategy_type == StrategyType.SIMPLE_GRID:
-                await self._handle_simple_grid_order_completion(order, grid_level)
-            elif self.strategy_type == StrategyType.HEDGED_GRID:
-                await self._handle_hedged_grid_order_completion(order, grid_level)
-            else:
-                self.logger.error(f"Unsupported strategy type: {self.strategy_type}")
+            await self._handle_order_completion(order, grid_level)
 
         except OrderExecutionFailedError as e:
             self.logger.error(f"Failed while handling completed order - {str(e)}", exc_info=True)
@@ -102,14 +102,14 @@ class OrderManager:
 
         except Exception as e:
             self.logger.error(f"Error handling completed order {order.identifier}: {e}", exc_info=True)
-    
-    async def _handle_simple_grid_order_completion(
+
+    async def _handle_order_completion(
         self, 
         order: Order, 
         grid_level: GridLevel
     ) -> None:
         """
-        Handles completed orders for the Simple Grid Strategy.
+        Handles completed orders.
 
         Args:
             order: The completed Order instance.
@@ -117,10 +117,10 @@ class OrderManager:
         """
         if order.side == OrderSide.BUY:
             self.logger.info(f"Buy order completed at grid level {grid_level.price}.")
-            self.grid_manager.complete_buy_order(grid_level)
+            self.grid_manager.complete_order(grid_level, OrderSide.BUY)
             paired_sell_level = self.grid_manager.get_paired_sell_level(grid_level)
 
-            if paired_sell_level and paired_sell_level.can_place_sell_order():
+            if paired_sell_level and self.grid_manager.can_place_order(paired_sell_level, OrderSide.SELL):
                 self.logger.info(f"Placing sell limit order at grid level {paired_sell_level.price} for quantity {order.filled}")
                 self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, order.filled, paired_sell_level)
                 sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, order.filled, paired_sell_level.price)
@@ -128,17 +128,17 @@ class OrderManager:
                 if sell_order:
                     self.grid_manager.pair_grid_levels(grid_level, paired_sell_level)
                     self.balance_tracker.reserve_funds_for_sell(sell_order.amount)
-                    self.grid_manager.mark_sell_order_pending(paired_sell_level, sell_order)
+                    self.grid_manager.mark_order_pending(paired_sell_level, order)
                     self.order_book.add_order(sell_order, paired_sell_level)
                 else:
                     self.logger.error(f"Failed to place sell order at {paired_sell_level.price}")
 
         elif order.side == OrderSide.SELL:
             self.logger.info(f"Sell order completed at grid level {grid_level.price}.")
-            self.grid_manager.complete_sell_order(grid_level)
+            self.grid_manager.complete_order(grid_level, OrderSide.SELL)
             paired_buy_level = grid_level.paired_grid_level
 
-            if paired_buy_level is None or not paired_buy_level.can_place_buy_order():
+            if paired_buy_level is None or not self.grid_manager.can_place_order(paired_buy_level, OrderSide.BUY):
                 self.logger.error(f"No paired buy grid level for grid_level: {grid_level} - unable to place limit buy order.")
                 return
 
@@ -146,65 +146,9 @@ class OrderManager:
             self.transaction_validator.validate_buy_order(self.balance_tracker.balance, order.amount, paired_buy_level.price, paired_buy_level)
             order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, order.amount, paired_buy_level.price)
             self.balance_tracker.reserve_funds_for_buy(order.amount * paired_buy_level.price)
-            self.grid_manager.mark_buy_order_pending(grid_level, order)
+            self.grid_manager.mark_order_pending(grid_level, order)
             self.order_book.add_order(order, paired_buy_level)
             self.grid_manager.unpair_grid_levels(buy_grid_level=paired_buy_level, sell_grid_level=grid_level)
-
-    async def _handle_hedged_grid_order_completion(
-        self, 
-        order: Order, 
-        grid_level: GridLevel
-    ) -> None:
-        """
-        Handles completed orders for the Hedged Grid Strategy.
-
-        Args:
-            order: The completed Order instance.
-            grid_level: The grid level associated with the order.
-        """
-        if order.side == OrderSide.BUY:
-            self.logger.info(f"Buy order completed at grid level {grid_level.price}.")
-            self.grid_manager.complete_buy_order(grid_level)
-
-            # Place a sell order at the next higher grid level
-            paired_sell_level = self.grid_manager.get_paired_sell_level(grid_level)
-
-            if paired_sell_level and paired_sell_level.can_place_sell_order():
-                self.logger.info(f"Placing sell limit order at grid level {paired_sell_level.price} for quantity {order.filled}")
-                self.transaction_validator.validate_sell_order(self.balance_tracker.crypto_balance, order.filled, paired_sell_level)
-                sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, order.filled, paired_sell_level.price)
-
-                if sell_order:
-                    self.grid_manager.mark_sell_order_pending(paired_sell_level, sell_order)
-                    self.order_book.add_order(sell_order, paired_sell_level)
-                else:
-                    self.logger.error(f"Failed to place sell order at {paired_sell_level.price}")
-
-            # Place a new buy order at the same grid level
-            if grid_level.can_place_buy_order():
-                self.logger.info(f"Re-placing buy limit order at grid level {grid_level.price}.")
-                buy_order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, order.filled, grid_level.price)
-
-                if buy_order:
-                    self.grid_manager.mark_buy_order_pending(grid_level, buy_order)
-                    self.order_book.add_order(buy_order, grid_level)
-                else:
-                    self.logger.error(f"Failed to re-place buy order at {grid_level.price}")
-
-        elif order.side == OrderSide.SELL:
-            self.logger.info(f"Sell order completed at grid level {grid_level.price}.")
-            self.grid_manager.complete_sell_order(grid_level)
-
-            # Place a new sell order at the same grid level
-            if grid_level.can_place_sell_order():
-                self.logger.info(f"Re-placing sell limit order at grid level {grid_level.price}.")
-                sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, order.filled, grid_level.price)
-
-                if sell_order:
-                    self.grid_manager.mark_sell_order_pending(grid_level, sell_order)
-                    self.order_book.add_order(sell_order, grid_level)
-                else:
-                    self.logger.error(f"Failed to re-place sell order at {grid_level.price}")
 
     async def execute_take_profit_or_stop_loss_order(
         self,

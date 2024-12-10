@@ -37,6 +37,7 @@ class GridTradingStrategy(TradingStrategy):
         self.plotter = plotter
         self.trading_mode = self.config_manager.get_trading_mode()
         self.data = self._initialize_data() if self.trading_mode == TradingMode.BACKTEST else None
+        self.pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
         self._running = True
     
     def _initialize_data(self) -> Optional[pd.DataFrame]:
@@ -69,7 +70,12 @@ class GridTradingStrategy(TradingStrategy):
 
     async def run(self):
         self._running = True
-        await self.order_manager.initialize_grid_orders()
+        
+        current_price = (
+            self.data['close'].iloc[0] if self.trading_mode == TradingMode.BACKTEST
+            else await self.exchange_service.get_current_price(self.pair)
+        )
+        await self.order_manager.initialize_grid_orders(current_price)
 
         if self.trading_mode == TradingMode.BACKTEST:
             await self._run_backtest()
@@ -80,7 +86,6 @@ class GridTradingStrategy(TradingStrategy):
     
     async def _run_live_or_paper_trading(self):
         self.logger.info(f"Starting {'live' if self.trading_mode == TradingMode.LIVE else 'paper'} trading")
-        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
         last_price: Optional[float] = None
 
         async def on_ticker_update(current_price):
@@ -96,7 +101,7 @@ class GridTradingStrategy(TradingStrategy):
                 return
 
             last_price = current_price
-        await self.exchange_service.listen_to_ticker_updates(pair, on_ticker_update, self.TICKER_REFRESH_INTERVAL)
+        await self.exchange_service.listen_to_ticker_updates(self.pair, on_ticker_update, self.TICKER_REFRESH_INTERVAL)
 
     async def _run_backtest(self) -> None:
         if self.data is None:

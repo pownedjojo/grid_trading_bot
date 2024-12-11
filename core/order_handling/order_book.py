@@ -30,9 +30,6 @@ class OrderBook:
     def get_sell_orders_with_grid(self) -> List[Tuple[Order, Optional[GridLevel]]]:
         return [(order, self.order_to_grid_map.get(order, None)) for order in self.sell_orders]
 
-    def get_non_grid_orders(self) -> List[Order]:
-        return self.non_grid_orders
-    
     def get_all_buy_orders(self) -> List[Order]:
         return self.buy_orders
 

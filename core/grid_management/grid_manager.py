@@ -50,6 +50,9 @@ class GridManager:
                 for price in self.price_grids
             }
         self.logger.info(f"Grids and levels initialized. Central price: {self.central_price}")
+    
+    def get_trigger_price(self) -> float:
+        return self.central_price
 
     def get_order_size_for_grid_level(
         self,
@@ -70,45 +73,47 @@ class GridManager:
         total_grids = len(self.grid_levels)
         order_size = self.initial_balance / total_grids / current_price
         return order_size
+    
+    def get_initial_order_quantity(self, current_price: float) -> float:
+        """
+        Calculates the initial quantity of crypto to purchase for grid initialization.
+
+        Args:
+            current_price: The current market price.
+
+        Returns:
+            The quantity of crypto to purchase.
+        """
+        initial_allocation = self.initial_balance / 2  # Allocate 50% of balance for initial buy
+        return initial_allocation / current_price
 
     def pair_grid_levels(
         self, 
-        buy_grid_level: GridLevel, 
-        sell_grid_level: GridLevel
-    ):
+        source_grid_level: GridLevel, 
+        target_grid_level: GridLevel, 
+        pairing_type: str
+    ) -> None:
         """
-        Dynamically pairs a buy grid level with a sell grid level.
-        This method ensures that grid levels are paired correctly, updating their `paired_grid_level` attributes.
+        Dynamically pairs grid levels for buy or sell purposes.
 
         Args:
-            buy_grid_level: The `GridLevel` object representing the buy grid level.
-            sell_grid_level: The `GridLevel` object representing the sell grid level.
+            source_grid_level: The grid level initiating the pairing.
+            target_grid_level: The grid level being paired.
+            pairing_type: "buy" or "sell" to specify the type of pairing.
         """
-        if buy_grid_level.paired_grid_level or sell_grid_level.paired_grid_level:
-            raise ValueError(f"Grid levels {buy_grid_level} or {sell_grid_level} are already paired.")
+        if pairing_type == "buy":
+            source_grid_level.paired_buy_level = target_grid_level
+            target_grid_level.paired_sell_level = source_grid_level
+            self.logger.info(f"Paired sell grid level {source_grid_level.price} with buy grid level {target_grid_level.price}.")
+            
+        elif pairing_type == "sell":
+            source_grid_level.paired_sell_level = target_grid_level
+            target_grid_level.paired_buy_level = source_grid_level
+            self.logger.info(f"Paired buy grid level {source_grid_level.price} with sell grid level {target_grid_level.price}.")
 
-        buy_grid_level.paired_grid_level = sell_grid_level
-        sell_grid_level.paired_grid_level = buy_grid_level
-        self.logger.info(f"Paired buy level {buy_grid_level.price} with sell level {sell_grid_level.price}.")
+        else:
+            raise ValueError(f"Invalid pairing type: {pairing_type}. Must be 'buy' or 'sell'.")
     
-    def unpair_grid_levels(
-        self, 
-        buy_grid_level: GridLevel, 
-        sell_grid_level: GridLevel
-    ):
-        """
-        Removes the pairing between a buy grid level and a sell grid level.
-        This method resets the `paired_grid_level` attribute for both grid levels, allowing them to be re-paired 
-        dynamically if needed.
-
-        Args:
-            buy_grid_level: The `GridLevel` object representing the buy grid level.
-            sell_grid_level: The `GridLevel` object representing the sell grid level.
-        """
-        buy_grid_level.paired_grid_level = None
-        sell_grid_level.paired_grid_level = None
-        self.logger.info(f"Unpaired buy level {buy_grid_level.price} with sell level {sell_grid_level.price}.")
-
     def get_paired_sell_level(
         self, 
         buy_grid_level: GridLevel
@@ -149,6 +154,24 @@ class GridManager:
         else:
             self.logger.error(f"Unsupported strategy type: {self.strategy_type}")
             return None
+    
+    def get_grid_level_below(self, grid_level: GridLevel) -> Optional[GridLevel]:
+        """
+        Returns the grid level immediately below the given grid level.
+
+        Args:
+            grid_level: The current grid level.
+
+        Returns:
+            The grid level below the given grid level, or None if it doesn't exist.
+        """
+        sorted_levels = sorted(self.grid_levels.keys())
+        current_index = sorted_levels.index(grid_level.price)
+
+        if current_index > 0:
+            lower_price = sorted_levels[current_index - 1]
+            return self.grid_levels[lower_price]
+        return None
     
     def mark_order_pending(
         self, 
@@ -198,18 +221,18 @@ class GridManager:
                 self.logger.info(f"Buy order completed at grid level {grid_level.price}. Transitioning to READY_TO_BUY_OR_SELL.")
             
                 # Transition the paired buy level to "READY_TO_SELL"
-                if grid_level.paired_grid_level:
-                    grid_level.paired_grid_level.state = GridCycleState.READY_TO_SELL
-                    self.logger.info(f"Paired sell grid level {grid_level.paired_grid_level.price} transitioned to READY_TO_SELL.")
+                if grid_level.paired_sell_level:
+                    grid_level.paired_sell_level.state = GridCycleState.READY_TO_SELL
+                    self.logger.info(f"Paired sell grid level {grid_level.paired_sell_level.price} transitioned to READY_TO_SELL.")
 
             elif order_side == OrderSide.SELL:
                 grid_level.state = GridCycleState.READY_TO_BUY_OR_SELL
                 self.logger.info(f"Sell order completed at grid level {grid_level.price}. Transitioning to READY_TO_BUY_OR_SELL.")
 
                 # Transition the paired buy level to "READY_TO_BUY"
-                if grid_level.paired_grid_level:
-                    grid_level.paired_grid_level.state = GridCycleState.READY_TO_BUY
-                    self.logger.info(f"Paired buy grid level {grid_level.paired_grid_level.price} transitioned to READY_TO_BUY.")
+                if grid_level.paired_buy_level:
+                    grid_level.paired_buy_level.state = GridCycleState.READY_TO_BUY
+                    self.logger.info(f"Paired buy grid level {grid_level.paired_buy_level.price} transitioned to READY_TO_BUY.")
 
         else:
             self.logger.error("Unexpected strategy type")

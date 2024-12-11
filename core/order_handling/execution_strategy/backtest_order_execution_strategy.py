@@ -12,17 +12,18 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
         price: float
     ) -> Optional[Order]:
         order_id = f"backtest-{int(time.time())}"
+        timestamp = int(time.time() * 1000)
         return Order(
             identifier=order_id,
             status=OrderStatus.OPEN,
             order_type=OrderType.MARKET,
             side=order_side,
             price=price,
-            average=100,
-            amount=1,
+            average=price,
+            amount=quantity,
             filled=quantity,
             remaining=0,
-            timestamp=1695890800,
+            timestamp=timestamp,
             datetime="111",
             last_trade_timestamp=1,
             symbol=pair,
@@ -47,7 +48,7 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
             amount=quantity,
             filled=0,
             remaining=quantity,
-            timestamp=1695890800,
+            timestamp=0,
             datetime="",
             last_trade_timestamp=1,
             symbol=pair,
@@ -68,7 +69,7 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
             amount=1,
             filled=1,
             remaining=0,
-            timestamp=1695890800,
+            timestamp=0,
             datetime="111",
             last_trade_timestamp=1,
             symbol="ETH/BTC",

@@ -5,7 +5,7 @@ from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
 from core.order_handling.order_manager import OrderManager
-from core.validation.transaction_validator import TransactionValidator
+from core.validation.order_validator import OrderValidator
 from core.order_handling.order_status_tracker import OrderStatusTracker
 from core.bot_management.event_bus import EventBus, Events
 from core.order_handling.fee_calculator import FeeCalculator
@@ -45,7 +45,7 @@ class GridTradingBot:
             self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, self.trading_mode)
             order_execution_strategy = OrderExecutionStrategyFactory.create(self.config_manager, self.exchange_service)
             grid_manager = GridManager(self.config_manager)
-            transaction_validator = TransactionValidator()
+            order_validator = OrderValidator()
             fee_calculator = FeeCalculator(self.config_manager)
             self.balance_tracker = BalanceTracker(self.event_bus, fee_calculator, self.config_manager.get_initial_balance(), 0)
             order_book = OrderBook()
@@ -60,7 +60,7 @@ class GridTradingBot:
             order_manager = OrderManager(
                 self.config_manager,
                 grid_manager,
-                transaction_validator,
+                order_validator,
                 self.balance_tracker,
                 order_book,
                 self.event_bus,

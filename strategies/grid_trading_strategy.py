@@ -69,30 +69,31 @@ class GridTradingStrategy(TradingStrategy):
             await self.run()
 
     async def run(self):
-        self._running = True
-        
-        current_price = (
-            self.data['close'].iloc[0] if self.trading_mode == TradingMode.BACKTEST
-            else await self.exchange_service.get_current_price(self.pair)
-        )
-        await self.order_manager.initialize_grid_orders(current_price)
+        self._running = True        
+        trigger_price = self.grid_manager.get_trigger_price()
 
         if self.trading_mode == TradingMode.BACKTEST:
-            await self._run_backtest()
+            await self._run_backtest(trigger_price)
             self.logger.info("Ending backtest simulation")
             self._running = False
         else:
-            await self._run_live_or_paper_trading()
+            await self._run_live_or_paper_trading(trigger_price)
     
-    async def _run_live_or_paper_trading(self):
+    async def _run_live_or_paper_trading(self, trigger_price: float):
         self.logger.info(f"Starting {'live' if self.trading_mode == TradingMode.LIVE else 'paper'} trading")
         last_price: Optional[float] = None
+        grid_orders_initialized = False
 
         async def on_ticker_update(current_price):
-            nonlocal last_price
+            nonlocal last_price, grid_orders_initialized
             
             if not self._running:
                 self.logger.info("Trading stopped; halting price updates.")
+                return
+            
+            grid_orders_initialized = await self._initialize_grid_orders_once(current_price, trigger_price, grid_orders_initialized)
+
+            if not grid_orders_initialized:
                 return
 
             if await self._check_take_profit_stop_loss(current_price):
@@ -103,7 +104,7 @@ class GridTradingStrategy(TradingStrategy):
             last_price = current_price
         await self.exchange_service.listen_to_ticker_updates(self.pair, on_ticker_update, self.TICKER_REFRESH_INTERVAL)
 
-    async def _run_backtest(self) -> None:
+    async def _run_backtest(self, trigger_price: float) -> None:
         if self.data is None:
             self.logger.error("No data available for backtesting.")
             return
@@ -115,14 +116,40 @@ class GridTradingStrategy(TradingStrategy):
         self.low_prices = self.data['low'].values
         timestamps = self.data.index
         self.data.loc[timestamps[0], 'account_value'] = self.config_manager.get_initial_balance()
+        grid_orders_initialized = False
 
         for i, (current_price, high_price, low_price, timestamp) in enumerate(zip(self.close_prices, self.high_prices, self.low_prices, timestamps)):
+            grid_orders_initialized = await self._initialize_grid_orders_once(current_price, trigger_price, grid_orders_initialized)
+
+            if not grid_orders_initialized:
+                self.data.loc[timestamps[i], 'account_value'] = self.config_manager.get_initial_balance()
+                continue
+
             await self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
 
             if await self._check_take_profit_stop_loss(current_price):
                 break
 
             self.data.loc[timestamp, 'account_value'] = self.balance_tracker.get_total_balance_value(current_price)
+    
+    async def _initialize_grid_orders_once(
+        self, 
+        current_price: float, 
+        trigger_price: float, 
+        grid_orders_initialized: bool
+    ) -> bool:
+        if grid_orders_initialized:
+            return True
+
+        if current_price < trigger_price:
+            self.logger.debug(f"Current price {current_price} below trigger price {trigger_price}. Waiting.")
+            return False
+
+        self.logger.info(f"Current price {current_price} reached trigger price {trigger_price}. Will perform initial purhcase")
+        await self.order_manager.perform_initial_purchase(current_price)
+        self.logger.info(f"Initial purchase done, will initialize grid orders")
+        await self.order_manager.initialize_grid_orders(current_price)
+        return True
 
     def generate_performance_report(self) -> Tuple[dict, list]:
         final_price = self.close_prices[-1]

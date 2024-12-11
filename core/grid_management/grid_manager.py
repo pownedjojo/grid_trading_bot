@@ -292,6 +292,7 @@ class GridManager:
         if spacing_type == SpacingType.ARITHMETIC:
             grids = np.linspace(bottom_range, top_range, num_grids)
             central_price = (top_range + bottom_range) / 2
+
         elif spacing_type == SpacingType.GEOMETRIC:
             grids = []
             ratio = (top_range / bottom_range) ** (1 / (num_grids - 1))
@@ -306,4 +307,8 @@ class GridManager:
                 central_price = (grids[central_index - 1] + grids[central_index]) / 2
             else:
                 central_price = grids[central_index]
+
+        else:
+            raise ValueError(f"Unsupported spacing type: {spacing_type}")
+
         return grids, central_price

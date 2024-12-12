@@ -165,13 +165,6 @@ class TestBacktestExchangeService:
             await service.get_current_price("BTC/USD")
 
     @pytest.mark.asyncio
-    async def test_get_order_status_not_implemented(self, config_manager):
-        service = BacktestExchangeService(config_manager)
-
-        with pytest.raises(NotImplementedError, match="get_order_status is not used in backtesting"):
-            await service.get_order_status("order_id")
-
-    @pytest.mark.asyncio
     async def test_cancel_order_not_implemented(self, config_manager):
         service = BacktestExchangeService(config_manager)
 

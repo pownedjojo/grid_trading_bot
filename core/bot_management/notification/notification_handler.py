@@ -21,7 +21,7 @@ class NotificationHandler:
         self.lock = asyncio.Lock()
         self.apprise_instance = apprise.Apprise() if self.enabled else None
         
-        if self.enabled:
+        if self.enabled and urls is not None:
             self.event_bus.subscribe(Events.ORDER_COMPLETED, self._send_notification_on_order_completed)
 
             for url in urls:

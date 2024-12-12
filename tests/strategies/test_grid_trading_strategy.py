@@ -1,7 +1,9 @@
 import pytest, logging
 import pandas as pd
+import numpy as np
 from unittest.mock import AsyncMock, Mock
 from config.config_manager import ConfigManager
+from core.bot_management.event_bus import EventBus, Events
 from core.services.exchange_interface import ExchangeInterface
 from core.grid_management.grid_manager import GridManager
 from core.order_handling.order_manager import OrderManager
@@ -21,6 +23,7 @@ class TestGridTradingStrategy:
         balance_tracker = Mock(spec=BalanceTracker)
         trading_performance_analyzer = Mock(spec=TradingPerformanceAnalyzer)
         plotter = Mock(spec=Plotter)
+        event_bus = Mock(spec=EventBus)
 
         config_manager.get_trading_mode.return_value = TradingMode.BACKTEST
         config_manager.get_base_currency.return_value = "BTC"
@@ -37,6 +40,7 @@ class TestGridTradingStrategy:
         def create_strategy():
             return GridTradingStrategy(
                 config_manager=config_manager,
+                event_bus=event_bus,
                 exchange_service=exchange_service,
                 grid_manager=grid_manager,
                 order_manager=order_manager,
@@ -45,7 +49,7 @@ class TestGridTradingStrategy:
                 plotter=plotter
             )
 
-        return create_strategy, config_manager, exchange_service, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter
+        return create_strategy, config_manager, exchange_service, grid_manager, order_manager, balance_tracker, trading_performance_analyzer, plotter, event_bus
     
     @pytest.mark.asyncio
     async def test_initialize_strategy(self, setup_strategy):
@@ -68,40 +72,62 @@ class TestGridTradingStrategy:
         exchange_service.close_connection.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_restart_trading(self, setup_strategy):
-        create_strategy, _, _, _, _, _, *_ = setup_strategy
+    async def test_restart_live_trading(self, setup_strategy):
+        create_strategy, config_manager, exchange_service, grid_manager, _, _, _, _, _ = setup_strategy
+        config_manager.get_trading_mode.return_value = TradingMode.LIVE
         strategy = create_strategy()
-        strategy.run = AsyncMock()
+        grid_manager.get_trigger_price.return_value = 10500
+        exchange_service.listen_to_ticker_updates = AsyncMock()
         strategy._running = False
 
         await strategy.restart()
 
-        assert strategy._running is True
-        strategy.run.assert_awaited_once()
+        # Assert that the strategy started and `listen_to_ticker_updates` was called
+        assert strategy._running is True, "Expected strategy to be running after restart in LIVE mode."
+
+        # Extract the actual callback passed to `listen_to_ticker_updates`
+        actual_call_args = exchange_service.listen_to_ticker_updates.call_args
+        actual_callback = actual_call_args[0][1]  # Extract the callback argument
+
+        # Verify `listen_to_ticker_updates` was called with the correct parameters
+        assert actual_call_args[0][0] == strategy.pair, "Expected the trading pair to be passed."
+        assert actual_call_args[0][2] == strategy.TICKER_REFRESH_INTERVAL, "Expected the correct ticker refresh interval."
+        assert callable(actual_callback), "Expected a callable callback for on_ticker_update."
 
     @pytest.mark.asyncio
     async def test_run_backtest(self, setup_strategy):
-        create_strategy, config_manager, _, _, _, balance_tracker, *_ = setup_strategy
-        config_manager.is_stop_loss_enabled.return_value = False
+        create_strategy, config_manager, _, grid_manager, order_manager, balance_tracker, *_ = setup_strategy
+        config_manager.get_trading_mode.return_value = TradingMode.BACKTEST
+        config_manager.get_initial_balance.return_value = 9000
+        balance_tracker.get_total_balance_value = Mock()
 
         strategy = create_strategy()
 
-        config_manager.get_trading_mode.return_value = TradingMode.BACKTEST
         strategy.data = pd.DataFrame(
-            {'close': [10000, 10500, 11000]},
+            {
+                'close': [10000, 10500, 11000],
+                'high': [10100, 10600, 11100],
+                'low': [9900, 10400, 10900],
+                'account_value': [np.nan, np.nan, np.nan],
+            },
             index=pd.to_datetime(['2024-01-01', '2024-01-02', '2024-01-03'])
         )
 
-        balance_tracker.get_total_balance_value = AsyncMock(side_effect=[10000, 10500, 11000, 11000])
-        strategy.data.loc[strategy.data.index[0], 'account_value'] = await balance_tracker.get_total_balance_value(10000)
+        balance_tracker.get_total_balance_value.side_effect = [9000, 9500, 10000]
+        grid_manager.get_trigger_price.return_value = 8900
+        order_manager.simulate_order_fills = AsyncMock()
+        order_manager.initialize_grid_orders = AsyncMock()
+        strategy._check_take_profit_stop_loss = AsyncMock(return_value=False)
 
         await strategy.run()
 
-        assert "account_value" in strategy.data.columns, "Expected 'account_value' column to be present in data"
-        assert strategy.data['account_value'].notna().all(), "Expected all 'account_value' entries to be populated."
-
-        expected_account_values = pd.Series([10500, 11000, 11000], index=strategy.data.index, name='account_value')
+        expected_account_values = pd.Series([9000, 9500, 10000], index=strategy.data.index, name='account_value')
         pd.testing.assert_series_equal(strategy.data['account_value'], expected_account_values.astype('float64'))
+        order_manager.initialize_grid_orders.assert_called_once()
+        order_manager.perform_initial_purchase.assert_called_once()
+        assert order_manager.simulate_order_fills.call_count == len(strategy.data), (
+            f"Expected simulate_order_fills to be called {len(strategy.data)} times, got {order_manager.simulate_order_fills.call_count}."
+        )
 
     @pytest.mark.asyncio
     async def test_run_live_trading(self, setup_strategy):
@@ -115,29 +141,28 @@ class TestGridTradingStrategy:
         exchange_service.listen_to_ticker_updates.assert_called_once()
 
     def test_generate_performance_report(self, setup_strategy):
-        create_strategy, _, _, _, _, balance_tracker, trading_performance_analyzer, _ = setup_strategy
+        create_strategy, _, _, _, _, balance_tracker, trading_performance_analyzer, _, _ = setup_strategy
         strategy = create_strategy()
-
         strategy.data = pd.DataFrame({'close': [10000, 10500, 11000]})
         strategy.close_prices = strategy.data['close'].values
-        balance_tracker.balance = 5000
-        balance_tracker.crypto_balance = 1
+        final_price = strategy.data['close'].iloc[-1]
+        balance_tracker.get_adjusted_fiat_balance.return_value = 5000
+        balance_tracker.get_adjusted_crypto_balance.return_value = 1
         balance_tracker.total_fees = 10
         trading_performance_analyzer.generate_performance_summary = Mock()
 
         strategy.generate_performance_report()
-        
-        final_price = strategy.data['close'].iloc[-1]        
+
         trading_performance_analyzer.generate_performance_summary.assert_called_once_with(
             strategy.data,
-            balance_tracker.balance,
-            balance_tracker.crypto_balance,
+            balance_tracker.get_adjusted_fiat_balance(),
+            balance_tracker.get_adjusted_crypto_balance(),
             final_price,
             balance_tracker.total_fees
         )
 
     def test_plot_results(self, setup_strategy):
-        create_strategy, config_manager, _, _, _, _, _, plotter = setup_strategy
+        create_strategy, config_manager, _, _, _, _, _, plotter, _ = setup_strategy
         config_manager.get_trading_mode.return_value = TradingMode.BACKTEST
         strategy = create_strategy()
         strategy.data = pd.DataFrame({'close': [10000, 10500, 11000]})
@@ -147,7 +172,7 @@ class TestGridTradingStrategy:
         plotter.plot_results.assert_called_once_with(strategy.data)
 
     def test_plot_results_not_available_in_live_mode(self, setup_strategy, caplog):
-        create_strategy, config_manager, _, _, _, _, _, plotter = setup_strategy
+        create_strategy, config_manager, _, _, _, _, _, plotter, _ = setup_strategy
         config_manager.get_trading_mode.return_value = TradingMode.LIVE
         strategy = create_strategy()
 

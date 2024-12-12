@@ -171,12 +171,6 @@ class BacktestExchangeService(ExchangeInterface):
     ) -> float:
         raise NotImplementedError("get_current_price is not used in backtesting")
 
-    async def get_order_status(
-        self, 
-        order_id: str
-    ) -> Dict[str, Union[str, float]]:
-        raise NotImplementedError("get_order_status is not used in backtesting")
-
     async def cancel_order(
         self, 
         order_id: str, 

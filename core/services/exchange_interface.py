@@ -43,14 +43,6 @@ class ExchangeInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_order_status(
-        self, 
-        order_id: str
-    ) -> Dict[str, Union[str, float]]:
-        """Fetches the status of an order by its ID, returning details such as status and filled quantity."""
-        pass
-
-    @abstractmethod
     async def cancel_order(
         self, 
         order_id: str, 

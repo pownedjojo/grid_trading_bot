@@ -1,286 +1,221 @@
-from unittest.mock import Mock, AsyncMock, patch
 import pytest
+from unittest.mock import AsyncMock, Mock
 from core.order_handling.order_manager import OrderManager
-from core.order_handling.order import Order, OrderType, OrderSide
-from core.grid_management.grid_level import GridLevel
-from core.services.exchange_interface import ExchangeInterface
-from core.order_handling.execution_strategy.live_order_execution_strategy import LiveOrderExecutionStrategy
-from core.order_handling.execution_strategy.backtest_order_execution_strategy import BacktestOrderExecutionStrategy
-from core.validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
+from core.order_handling.order import OrderSide, OrderStatus, OrderType
 from core.bot_management.notification.notification_content import NotificationType
+from core.order_handling.exceptions import OrderExecutionFailedError
+from core.bot_management.event_bus import EventBus
 
+@pytest.mark.asyncio
 class TestOrderManager:
     @pytest.fixture
-    def mock_dependencies(self):
-        return {
-            'config_manager': Mock(),
-            'grid_manager': Mock(),
-            'transaction_validator': Mock(),
-            'balance_tracker': AsyncMock(),
-            'order_book': Mock(), 
-            'notification_handler': AsyncMock()
-        }
+    def setup_order_manager(self):
+        config_manager = Mock()
+        config_manager.get_trading_mode.return_value = "LIVE"
+        config_manager.get_base_currency.return_value = "BTC"
+        config_manager.get_quote_currency.return_value = "USD"
+        config_manager.get_strategy_type.return_value = "GRID"
 
-    @pytest.fixture
-    def mock_exchange_service(self):
-        return Mock(spec=ExchangeInterface)
+        grid_manager = Mock()
+        order_validator = Mock()
+        balance_tracker = Mock()
+        order_book = Mock()
+        event_bus = Mock(spec=EventBus)
+        order_execution_strategy = Mock()
+        notification_handler = Mock()
+        notification_handler.async_send_notification = AsyncMock()
 
-    @pytest.fixture(params=["backtest", "live"])
-    def order_manager(self, request, mock_dependencies, mock_exchange_service):
-        if request.param == "live":
-            strategy = LiveOrderExecutionStrategy(exchange_service=mock_exchange_service)
-        else:
-            strategy = BacktestOrderExecutionStrategy()
-
-        return OrderManager(
-            config_manager=mock_dependencies['config_manager'],
-            grid_manager=mock_dependencies['grid_manager'],
-            transaction_validator=mock_dependencies['transaction_validator'],
-            balance_tracker=mock_dependencies['balance_tracker'],
-            order_book=mock_dependencies['order_book'],
-            notification_handler=mock_dependencies['notification_handler'],
-            order_execution_strategy=strategy
+        manager = OrderManager(
+            config_manager=config_manager,
+            grid_manager=grid_manager,
+            order_validator=order_validator,
+            balance_tracker=balance_tracker,
+            order_book=order_book,
+            event_bus=event_bus,
+            order_execution_strategy=order_execution_strategy,
+            notification_handler=notification_handler,
         )
+        return manager, config_manager, grid_manager, order_validator, balance_tracker, order_book, event_bus, order_execution_strategy, notification_handler
 
-    @pytest.mark.asyncio
-    async def test_execute_order_no_grid_cross(self, order_manager, mock_dependencies):
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = None
-        
-        await order_manager.execute_order(OrderSide.BUY, 1000, 900, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['grid_manager'].get_crossed_grid_level.assert_called_once()
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_not_called()
-        mock_dependencies['balance_tracker'].update_after_buy.assert_not_called()
+    async def test_initialize_grid_orders_buy_orders(self, setup_order_manager):
+        manager, _, grid_manager, order_validator, balance_tracker, _, _, order_execution_strategy, _ = setup_order_manager
+        grid_manager.sorted_buy_grids = [50000, 49000, 48000]
+        grid_manager.sorted_sell_grids = []
+        grid_manager.grid_levels = {50000: Mock(), 49000: Mock(), 48000: Mock()}
+        grid_manager.can_place_order.side_effect = lambda level, side: side == OrderSide.BUY
+        order_validator.adjust_and_validate_buy_quantity.return_value = 0.01
+        balance_tracker.balance = 1000
+        order_execution_strategy.execute_limit_order = AsyncMock(return_value=Mock())
 
-    @pytest.mark.asyncio
-    async def test_execute_buy_order_with_valid_grid_cross(self, order_manager, mock_dependencies):
-        crossed_grid_level = Mock(spec=GridLevel, price=1000)
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
-        mock_dependencies['grid_manager'].get_order_size_per_grid.return_value = 1000
-        mock_dependencies['balance_tracker'].balance = 10000
+        await manager.initialize_grid_orders(49500)
 
-        if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
-            mock_order_result = {
-                'status': 'filled',
-                'price': 1000,
-                'filled_qty': 1000,
-                'timestamp': "2024-01-01T00:00:00Z"
-            }
-            order_manager.order_execution_strategy.execute_market_order = AsyncMock(return_value=mock_order_result)
+        grid_manager.can_place_order.assert_called()
+        assert order_execution_strategy.execute_limit_order.call_count == 2
 
-        await order_manager.execute_order(OrderSide.BUY, 1000, 900, "2024-01-01T00:00:00Z")
+    async def test_initialize_grid_orders_sell_orders(self, setup_order_manager):
+        manager, _, grid_manager, order_validator, balance_tracker, _, _, order_execution_strategy, _ = setup_order_manager
+        grid_manager.sorted_sell_grids = [52000, 53000, 54000]
+        grid_manager.sorted_buy_grids = []
+        grid_manager.grid_levels = {52000: Mock(), 53000: Mock(), 54000: Mock()}
+        grid_manager.can_place_order.side_effect = lambda level, side: side == OrderSide.SELL
+        order_validator.adjust_and_validate_sell_quantity.return_value = 0.01
+        balance_tracker.crypto_balance = 1
+        order_execution_strategy.execute_limit_order = AsyncMock(return_value=Mock())
 
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_called_once_with(
-            mock_dependencies['balance_tracker'].balance, 1000, 1000, crossed_grid_level
-        )
-        mock_dependencies['balance_tracker'].update_after_buy.assert_called_once_with(1000, 1000)
+        await manager.initialize_grid_orders(51500)
 
-    @pytest.mark.asyncio
-    async def test_execute_sell_order_with_valid_grid_cross(self, order_manager, mock_dependencies):
-        crossed_grid_level = Mock(spec=GridLevel, price=1000)
-        buy_order = Mock(quantity=5)
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
-        mock_dependencies['balance_tracker'].crypto_balance = 5
-        buy_grid_level = Mock()
-        buy_grid_level.buy_orders = [buy_order]
-        mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = buy_grid_level
+        grid_manager.can_place_order.assert_called()
+        assert order_execution_strategy.execute_limit_order.call_count == 3
 
-        if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
-            mock_order_result = {
-                'status': 'filled',
-                'price': 1000,
-                'filled_qty': buy_order.quantity,
-                'timestamp': "2024-01-01T00:00:00Z"
-            }
-            order_manager.order_execution_strategy.execute_market_order = AsyncMock(return_value=mock_order_result)
+    async def test_on_order_completed(self, setup_order_manager):
+        manager, _, _, _, _, order_book, event_bus, _, notification_handler = setup_order_manager
+        mock_order = Mock(side=OrderSide.BUY, price=50000)
+        mock_grid_level = Mock()
+        order_book.get_grid_level_for_order.return_value = mock_grid_level
+        manager._handle_order_completion = AsyncMock()
 
-        await order_manager.execute_order(OrderSide.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
+        await manager._on_order_completed(mock_order)
 
-        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(
-            mock_dependencies['balance_tracker'].crypto_balance, 
-            buy_order.quantity, 
-            crossed_grid_level
-        )
-        mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(buy_order.quantity, 1000)
+        order_book.get_grid_level_for_order.assert_called_once_with(mock_order)
+        manager._handle_order_completion.assert_awaited_once_with(mock_order, mock_grid_level)
 
-        if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
-            mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
-                NotificationType.ORDER_PLACED,
-                order_details="Id=N/A, side=OrderSide.SELL, type=OrderType.MARKET, price=1000, quantity=5, timestamp=2024-01-01T00:00:00Z, state=OrderState.PENDING"
+    async def test_on_order_completed_no_grid_level(self, setup_order_manager):
+        manager, _, _, _, _, order_book, _, _, _ = setup_order_manager
+        mock_order = Mock()
+
+        order_book.get_grid_level_for_order.return_value = None
+
+        await manager._on_order_completed(mock_order)
+
+        order_book.get_grid_level_for_order.assert_called_once_with(mock_order)
+
+    async def test_handle_order_completion_buy(self, setup_order_manager):
+        manager, _, grid_manager, _, _, _, _, _, _ = setup_order_manager
+        mock_order = Mock(side=OrderSide.BUY, filled=0.01)
+        mock_grid_level = Mock(price=50000)
+        grid_manager.get_paired_sell_level.return_value = Mock()
+        grid_manager.can_place_order.return_value = True
+        manager._place_sell_order = AsyncMock()
+
+        await manager._handle_order_completion(mock_order, mock_grid_level)
+
+        manager._place_sell_order.assert_awaited_once()
+
+    async def test_handle_order_completion_sell(self, setup_order_manager):
+        manager, _, grid_manager, _, _, _, _, _, _ = setup_order_manager
+        mock_order = Mock(side=OrderSide.SELL, filled=0.01)
+        mock_grid_level = Mock(price=50000)
+        manager._get_or_create_paired_buy_level = Mock(return_value=Mock())
+        manager._place_buy_order = AsyncMock()
+
+        await manager._handle_order_completion(mock_order, mock_grid_level)
+
+        manager._place_buy_order.assert_awaited_once()
+
+    async def test_perform_initial_purchase(self, setup_order_manager):
+        manager, _, grid_manager, _, _, _, _, order_execution_strategy, _ = setup_order_manager
+        grid_manager.get_initial_order_quantity.return_value = 0.01
+        order_execution_strategy.execute_market_order = AsyncMock(return_value=Mock())
+
+        await manager.perform_initial_purchase(50000)
+
+        order_execution_strategy.execute_market_order.assert_awaited_once()
+
+    async def test_execute_take_profit_or_stop_loss_order(self, setup_order_manager):
+        manager, _, _, _, balance_tracker, order_book, _, order_execution_strategy, notification_handler = setup_order_manager
+        balance_tracker.crypto_balance = 0.5
+        order_execution_strategy.execute_market_order = AsyncMock(return_value=Mock())
+        notification_handler.async_send_notification = AsyncMock()
+
+        await manager.execute_take_profit_or_stop_loss_order(55000, take_profit_order=True)
+
+        order_execution_strategy.execute_market_order.assert_awaited_once_with(OrderSide.SELL, manager.pair, 0.5, 55000)
+        notification_handler.async_send_notification.assert_awaited_once()
+    
+    async def test_initialize_grid_orders_execution_failed(self, setup_order_manager):
+        manager, _, grid_manager, order_validator, balance_tracker, _, _, order_execution_strategy, notification_handler = setup_order_manager
+        grid_manager.sorted_buy_grids = [49000]
+        grid_manager.sorted_sell_grids = []
+        grid_manager.grid_levels = {49000: Mock()}
+        grid_manager.can_place_order.return_value = True
+        order_validator.adjust_and_validate_buy_quantity.return_value = 0.01
+        balance_tracker.balance = 1000
+
+        order_execution_strategy.execute_limit_order = AsyncMock(
+            side_effect=OrderExecutionFailedError(
+                message="Execution failed",
+                order_side=OrderSide.BUY,
+                order_type=OrderType.LIMIT,
+                pair="BTC/USD",
+                quantity=0.01,
+                price=50000
             )
-
-    @pytest.mark.asyncio
-    async def test_execute_take_profit(self, order_manager, mock_dependencies):
-        mock_dependencies['balance_tracker'].crypto_balance = 5
-        mock_order_result = {'price': 2000, 'filled_qty': 5, 'timestamp': "2024-01-01T00:00:00Z", 'status': 'filled'}
-        order_manager.order_execution_strategy = AsyncMock()
-        order_manager.order_execution_strategy.execute_market_order.return_value = mock_order_result
-        pair = f"{mock_dependencies['config_manager'].get_base_currency()}/{mock_dependencies['config_manager'].get_quote_currency()}"
-
-        await order_manager.execute_take_profit_or_stop_loss_order(2000, "2024-01-01T00:00:00Z", take_profit_order=True)
-
-        order_manager.order_execution_strategy.execute_market_order.assert_called_once_with(OrderSide.SELL, pair, 5, 2000)
-        mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(5, 2000)
-        mock_dependencies['order_book'].add_order.assert_called_once()
-        order_added = mock_dependencies['order_book'].add_order.call_args[0][0]
-        mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
-            NotificationType.TAKE_PROFIT_TRIGGERED,
-            order_details=str(order_added)
         )
-        assert order_added.order_side == OrderSide.SELL, "Expected order side to be SELL for take profit"
-        assert order_added.order_type == OrderType.MARKET, "Expected order type to be MARKET for take profit"
-        assert order_added.price == 2000, "Expected order price to be 2000 for take profit"
-        assert order_added.quantity == 5, "Expected order quantity to match crypto balance"
-        assert order_added.timestamp == "2024-01-01T00:00:00Z", "Expected timestamp to match input"
+        notification_handler.async_send_notification = AsyncMock()
 
-    @pytest.mark.asyncio
-    async def test_execute_stop_loss(self, order_manager, mock_dependencies):
-        mock_dependencies['balance_tracker'].crypto_balance = 5
-        mock_order_result = {'price': 1500, 'filled_qty': 5, 'timestamp': "2024-01-01T00:00:00Z", 'status': 'filled'}
-        order_manager.order_execution_strategy = AsyncMock()
-        order_manager.order_execution_strategy.execute_market_order.return_value = mock_order_result
-        pair = f"{mock_dependencies['config_manager'].get_base_currency()}/{mock_dependencies['config_manager'].get_quote_currency()}"
+        await manager.initialize_grid_orders(49500)
 
-        await order_manager.execute_take_profit_or_stop_loss_order(1500, "2024-01-01T00:00:00Z", stop_loss_order=True)
-
-        order_manager.order_execution_strategy.execute_market_order.assert_called_once_with(OrderSide.SELL, pair, 5, 1500)
-        mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(5, 1500)
-        mock_dependencies['order_book'].add_order.assert_called_once()
-        order_added = mock_dependencies['order_book'].add_order.call_args[0][0]
-        mock_dependencies['notification_handler'].async_send_notification.assert_called_once_with(
-            NotificationType.STOP_LOSS_TRIGGERED,
-            order_details=str(order_added)
+        notification_handler.async_send_notification.assert_awaited_once_with(
+            NotificationType.ORDER_FAILED,
+            error_details="Failed to place order: Execution failed"
         )
-        assert order_added.order_side == OrderSide.SELL, "Expected order side to be SELL for stop loss"
-        assert order_added.order_type == OrderType.MARKET, "Expected order type to be MARKET for stop loss"
-        assert order_added.price == 1500, "Expected order price to be 1500 for stop loss"
-        assert order_added.quantity == 5, "Expected order quantity to match crypto balance"
-        assert order_added.timestamp == "2024-01-01T00:00:00Z", "Expected timestamp to match input"
 
-    @pytest.mark.asyncio
-    async def test_process_buy_order_insufficient_balance(self, order_manager, mock_dependencies):
-        grid_level = Mock()
-        mock_dependencies['balance_tracker'].balance = 100
-        mock_dependencies['transaction_validator'].validate_buy_order.side_effect = InsufficientBalanceError
+    async def test_initialize_grid_orders_insufficient_balance(self, setup_order_manager):
+        manager, _, grid_manager, order_validator, balance_tracker, _, _, order_execution_strategy, _ = setup_order_manager
+        grid_manager.sorted_buy_grids = [49000]
+        grid_manager.sorted_sell_grids = []
+        grid_manager.grid_levels = {49000: Mock()}
+        grid_manager.can_place_order.return_value = True
+        order_validator.adjust_and_validate_buy_quantity.side_effect = ValueError("Insufficient balance")
+        balance_tracker.balance = 0  # Simulate insufficient balance
+        order_execution_strategy.execute_limit_order = AsyncMock()
 
-        await order_manager._process_buy_order(grid_level, 1000, "2024-01-01T00:00:00Z")
+        await manager.initialize_grid_orders(49500)
 
-        mock_dependencies['balance_tracker'].update_after_buy.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_process_sell_order_insufficient_crypto(self, order_manager, mock_dependencies):
-        grid_level = Mock()
-        buy_grid_level = Mock()
-        mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = buy_grid_level
-        mock_dependencies['transaction_validator'].validate_sell_order.side_effect = InsufficientCryptoBalanceError
-
-        await order_manager._process_sell_order(grid_level, 1000, "2024-01-01T00:00:00Z")
-
-        mock_dependencies['balance_tracker'].update_after_sell.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_multiple_buy_orders_for_sell(self, order_manager, mock_dependencies):
-        crossed_grid_level = Mock(spec=GridLevel, price=1000)
-        buy_order_1 = Mock(quantity=2)
-        buy_order_2 = Mock(quantity=3)
-        mock_dependencies['balance_tracker'].crypto_balance = 5
-
-        
-        mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = Mock(buy_orders=[buy_order_1, buy_order_2])
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
-        
-        await order_manager.execute_order(OrderSide.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(
-            mock_dependencies['balance_tracker'].crypto_balance, 3, crossed_grid_level
+        order_execution_strategy.execute_limit_order.assert_not_awaited()
+        grid_manager.can_place_order.assert_called_once_with(grid_manager.grid_levels[49000], OrderSide.BUY)
+        order_validator.adjust_and_validate_buy_quantity.assert_called_once_with(
+            balance=balance_tracker.balance,
+            order_quantity=grid_manager.get_order_size_for_grid_level.return_value,
+            price=49000
         )
     
-    @pytest.mark.asyncio
-    async def test_zero_quantity_order(self, order_manager, mock_dependencies):
-        mock_dependencies['balance_tracker'].balance = 0
-        grid_level = Mock()
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = 1000
-        mock_dependencies['grid_manager'].get_grid_level.return_value = grid_level
-        
-        await order_manager.execute_order(OrderSide.BUY, 1000, 900, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_not_called()
-        mock_dependencies['balance_tracker'].update_after_buy.assert_not_called()
+    async def test_on_order_completed_unexpected_error(self, setup_order_manager):
+        manager, _, _, _, _, order_book, _, _, _ = setup_order_manager
+        mock_order = Mock()
+        order_book.get_grid_level_for_order.return_value = Mock()
+        manager._handle_order_completion = AsyncMock(side_effect=Exception("Unexpected error"))
+
+        await manager._on_order_completed(mock_order)
+
+        manager._handle_order_completion.assert_awaited_once()
+
+    def test_get_or_create_paired_buy_level_no_fallback(self, setup_order_manager):
+        manager, _, grid_manager, _, _, _, _, _, _ = setup_order_manager
+        mock_sell_grid_level = Mock(paired_buy_level=None)
+        grid_manager.get_grid_level_below.return_value = None
+
+        paired_buy_level = manager._get_or_create_paired_buy_level(mock_sell_grid_level)
+
+        assert paired_buy_level is None
+        grid_manager.get_grid_level_below.assert_called_once_with(mock_sell_grid_level)
     
-    @pytest.mark.asyncio
-    async def test_extreme_price_fluctuation(self, order_manager, mock_dependencies):
-        crossed_grid_level = Mock(spec=GridLevel, price=1000)
-        mock_dependencies['grid_manager'].get_crossed_grid_level.side_effect = [None, crossed_grid_level]
+    async def test_simulate_order_fills_partial_fill(self, setup_order_manager):
+        manager, _, grid_manager, _, _, order_book, _, _, _ = setup_order_manager
+        mock_order = Mock(
+            side=OrderSide.BUY,
+            price=48000,
+            amount=0.02,
+            filled=0.01,
+            remaining=0.01,
+            status=OrderStatus.OPEN
+        )
+        order_book.get_open_orders.return_value = [mock_order]
+        grid_manager.sorted_buy_grids = [48000]
+        grid_manager.sorted_sell_grids = []
 
-        await order_manager.execute_order(OrderSide.BUY, 5000, 1000, "2024-01-01T00:00:00Z")
+        await manager.simulate_order_fills(49000, 47000, 1234567890)
 
-        mock_dependencies['grid_manager'].get_crossed_grid_level.assert_called_once_with(5000, 1000, sell=False)
-
-        # Reset mock call tracking for the second execution
-        mock_dependencies['grid_manager'].get_crossed_grid_level.reset_mock()
-
-        await order_manager.execute_order(OrderSide.BUY, 5000, 4000, "2024-01-01T00:01:00Z")
-        mock_dependencies['grid_manager'].get_crossed_grid_level.assert_called_once_with(5000, 4000, sell=False)
-
-    @pytest.mark.asyncio
-    async def test_negative_price_handling(self, order_manager, mock_dependencies):
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = None
-
-        # Simulate a negative price scenario
-        await order_manager.execute_order(OrderSide.BUY, -1000, 1000, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_not_called()
-        mock_dependencies['balance_tracker'].update_after_buy.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_partial_crypto_balance_for_sell(self, order_manager, mock_dependencies):
-        crossed_grid_level = Mock(spec=GridLevel, price=1000)
-        buy_order = Mock(quantity=5)
-        mock_dependencies['grid_manager'].find_lowest_completed_buy_grid.return_value = Mock(buy_orders=[buy_order])
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
-        mock_dependencies['balance_tracker'].crypto_balance = 3  # Partial balance available
-
-        if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
-            mock_order_result = {
-                'status': 'filled',
-                'price': 1000,
-                'filled_qty': 3,  # Partial quantity sold
-                'timestamp': "2024-01-01T00:00:00Z"
-            }
-            order_manager.order_execution_strategy.execute_market_order = AsyncMock(return_value=mock_order_result)
-
-        await order_manager.execute_order(OrderSide.SELL, 1000, 1100, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['transaction_validator'].validate_sell_order.assert_called_once_with(3, buy_order.quantity, crossed_grid_level)
-        mock_dependencies['balance_tracker'].update_after_sell.assert_called_once_with(3, 1000)
-        
-    @pytest.mark.asyncio
-    async def test_minimal_price_difference(self, order_manager, mock_dependencies):
-        mock_dependencies['grid_manager'].detect_grid_level_crossing.return_value = None
-
-        # Test minimal price difference (e.g., only $1 difference)
-        await order_manager.execute_order(OrderSide.BUY, 1000, 999, "2024-01-01T00:00:00Z")
-        
-        mock_dependencies['grid_manager'].get_grid_level.assert_not_called()
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_not_called()
-    
-    @pytest.mark.asyncio
-    async def test_high_volume_trades(self, order_manager, mock_dependencies):
-        crossed_grid_level = Mock(spec=GridLevel, price=1000)
-        mock_dependencies['grid_manager'].get_crossed_grid_level.return_value = crossed_grid_level
-        mock_dependencies['grid_manager'].get_order_size_per_grid.return_value = 10000
-        mock_dependencies['balance_tracker'].balance = 1000000  # Large balance for a large trade
-
-        if isinstance(order_manager.order_execution_strategy, LiveOrderExecutionStrategy):
-            mock_order_result = {
-                'status': 'filled',
-                'price': 900,
-                'filled_qty': 10000,
-                'timestamp': "2024-01-01T00:00:00Z"
-            }
-            order_manager.order_execution_strategy.execute_market_order = AsyncMock(return_value=mock_order_result)
-
-        await order_manager.execute_order(OrderSide.BUY, 1000, 900, "2024-01-01T00:00:00Z")
-
-        mock_dependencies['transaction_validator'].validate_buy_order.assert_called_once()
-        mock_dependencies['balance_tracker'].update_after_buy.assert_called_once()
+        assert mock_order.filled == 0.02
+        assert mock_order.remaining == 0.0
+        assert mock_order.status == OrderStatus.CLOSED

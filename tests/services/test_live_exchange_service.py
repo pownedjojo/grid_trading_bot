@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from core.services.live_exchange_service import LiveExchangeService
-from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError, InvalidOrderTypeError
+from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError
 from config.config_manager import ConfigManager
 from config.trading_mode import TradingMode
 
@@ -142,10 +142,8 @@ class TestLiveExchangeService:
         mock_ccxt.binance.return_value = mock_exchange_instance
         mock_getattr.return_value = mock_ccxt.binance
 
-        # Instantiate the LiveExchangeService
         service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
 
-        # Assert NotImplementedError is raised for fetch_ohlcv
         with pytest.raises(NotImplementedError, match="fetch_ohlcv is not used in live or paper trading mode."):
             service.fetch_ohlcv("BTC/USD", "1m", "start_date", "end_date")
     

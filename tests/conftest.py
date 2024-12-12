@@ -14,15 +14,16 @@ def valid_config():
             "quote_currency": "USDT"
         },
         "trading_settings": {
+            "initial_balance": 10000,
             "timeframe": "1m",
             "period": {
                 "start_date": "2024-07-04T00:00:00Z",
                 "end_date": "2024-07-11T00:00:00Z"
-            },
-            "initial_balance": 10000
+            }
         },
         "grid_strategy": {
-            "type": "arithmetic",
+            "type": "simple_grid",
+            "spacing": "geometric",
             "num_grids": 20,
             "range": {
                 "top": 3100,

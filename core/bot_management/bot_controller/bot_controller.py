@@ -64,11 +64,11 @@ class BotController:
             await self._display_balance()
 
         elif command == "stop":
-            self.event_bus.publish_sync(Events.STOP_BOT, "User issued stop command")
+            await self.event_bus.publish(Events.STOP_BOT, "User issued stop command")
 
         elif command == "restart":
-            self.event_bus.publish_sync(Events.STOP_BOT, "User issued restart command")
-            self.event_bus.publish_sync(Events.START_BOT, "User issued restart command")
+            await self.event_bus.publish(Events.STOP_BOT, "User issued restart command")
+            await self.event_bus.publish(Events.START_BOT, "User issued restart command")
         
         elif command.startswith("pause"):
             await self._pause_bot(command)
@@ -112,6 +112,10 @@ class BotController:
         try:
             current_balance = self.bot.balance_tracker.balance
             crypto_balance = self.bot.balance_tracker.crypto_balance
+
+            if current_balance is None or crypto_balance is None:
+                raise BalanceRetrievalError("Invalid balance data retrieved.")
+
             self.logger.info(f"Current Fiat balance: {current_balance}")
             self.logger.info(f"Current Crypto balance: {crypto_balance}")
 
@@ -127,11 +131,11 @@ class BotController:
         """
         try:
             duration = int(command.split()[1])
-            self.event_bus.publish(Events.STOP_BOT, "User issued pause command")
+            await self.event_bus.publish(Events.STOP_BOT, "User issued pause command")
             self.logger.info(f"Bot paused for {duration} seconds.")
             await asyncio.sleep(duration)
             self.logger.info("Resuming bot after pause.")
-            self.event_bus.publish(Events.START_BOT, "Resuming bot after pause")
+            await self.event_bus.publish(Events.START_BOT, "Resuming bot after pause")
 
         except ValueError:
             raise CommandParsingError("Invalid pause duration. Please specify in seconds.")

@@ -1,117 +1,142 @@
 import pytest, asyncio
 from unittest.mock import Mock, patch, AsyncMock
-from strategies.grid_trading_strategy import GridTradingStrategy
-from core.order_handling.balance_tracker import BalanceTracker
-from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
+from core.bot_management.event_bus import EventBus, Events
+from core.bot_management.grid_trading_bot import GridTradingBot
 from core.bot_management.bot_controller.bot_controller import BotController
 from core.bot_management.bot_controller.exceptions import BalanceRetrievalError, OrderRetrievalError
+from core.order_handling.balance_tracker import BalanceTracker
+from strategies.grid_trading_strategy import GridTradingStrategy
 
 @pytest.mark.asyncio
 class TestBotController:
     @pytest.fixture
     def setup_bot_controller(self):
-        strategy = Mock(spec=GridTradingStrategy)
-        balance_tracker = Mock(spec=BalanceTracker)
-        trading_performance_analyzer = Mock(spec=TradingPerformanceAnalyzer)
-        stop_event = asyncio.Event()
-        bot_controller = BotController(strategy, balance_tracker, trading_performance_analyzer, stop_event)
-        return bot_controller, strategy, balance_tracker, trading_performance_analyzer
+        bot = Mock(spec=GridTradingBot)
+        bot.strategy = Mock(spec=GridTradingStrategy)
+        bot.strategy.get_formatted_orders = Mock(return_value=[])
+        bot.balance_tracker = Mock(spec=BalanceTracker)
+        bot.balance_tracker.balance = 1000.0
+        bot.balance_tracker.crypto_balance = 2.0
+        bot.logger = Mock()
+        event_bus = Mock(spec=EventBus)
+        bot_controller = BotController(bot, event_bus)
+        return bot_controller, bot, event_bus
 
     @patch("builtins.input", side_effect=["quit"])
     async def test_command_listener_quit(self, mock_input, setup_bot_controller):
-        bot_controller, strategy, _, _ = setup_bot_controller
-        strategy.stop = AsyncMock()
+        bot_controller, _, event_bus = setup_bot_controller
+        event_bus.publish_sync = Mock()
 
         await bot_controller.command_listener()
 
-        strategy.stop.assert_called_once()
-        assert bot_controller._stop_listener
+        event_bus.publish_sync.assert_called_once_with(Events.STOP_BOT, "User requested shutdown")
+        assert bot_controller._stop_listening
 
     @patch("builtins.input", side_effect=["balance", "quit"])
     async def test_command_listener_balance_positive(self, mock_input, setup_bot_controller):
-        bot_controller, _, balance_tracker, _ = setup_bot_controller
-        balance_tracker.balance = 1000.0
-        balance_tracker.crypto_balance = 2.0
+        bot_controller, bot, _ = setup_bot_controller
+        bot_controller.logger = Mock()
 
         await bot_controller.command_listener()
 
-        assert balance_tracker.balance == 1000.0
-        assert balance_tracker.crypto_balance == 2.0
+        bot_controller.logger.info.assert_any_call(f"Current Fiat balance: {bot.balance_tracker.balance}")
+        bot_controller.logger.info.assert_any_call(f"Current Crypto balance: {bot.balance_tracker.crypto_balance}")
 
     @patch("builtins.input", side_effect=["balance", "quit"])
     async def test_command_listener_balance_zero_negative(self, mock_input, setup_bot_controller):
-        bot_controller, _, balance_tracker, _ = setup_bot_controller
-        balance_tracker.balance = 0.0
-        balance_tracker.crypto_balance = -0.5
+        bot_controller, bot, _ = setup_bot_controller
+        bot.balance_tracker.balance = 0.0
+        bot.balance_tracker.crypto_balance = -0.5
+        bot_controller.logger = Mock()
 
         await bot_controller.command_listener()
 
-        assert balance_tracker.balance == 0.0
-        assert balance_tracker.crypto_balance == -0.5
+        bot_controller.logger.info.assert_any_call(f"Current Fiat balance: 0.0")
+        bot_controller.logger.info.assert_any_call(f"Current Crypto balance: -0.5")
 
     @patch("builtins.input", side_effect=["orders", "quit"])
     async def test_command_listener_orders_with_orders(self, mock_input, setup_bot_controller):
-        bot_controller, _, _, trading_performance_analyzer = setup_bot_controller
-        trading_performance_analyzer.get_formatted_orders = Mock(return_value=[
-            {"Order Type": "BUY", "Price": 1000, "Quantity": 0.1, "Timestamp": "2024-01-01T00:00:00Z"}
+        bot_controller, bot, _ = setup_bot_controller
+        bot.strategy.get_formatted_orders = Mock(return_value=[
+            ["BUY", "LIMIT", 1000, 0.1, "2024-01-01T00:00:00Z", "Level 1", "0.1%"]
         ])
+        bot_controller.logger = Mock()
 
         await bot_controller.command_listener()
 
-        trading_performance_analyzer.get_formatted_orders.assert_called_once()
+        bot.strategy.get_formatted_orders.assert_called_once()
 
     @patch("builtins.input", side_effect=["orders", "quit"])
     async def test_command_listener_orders_empty(self, mock_input, setup_bot_controller):
-        bot_controller, _, _, trading_performance_analyzer = setup_bot_controller
-        trading_performance_analyzer.get_formatted_orders = Mock(return_value=[])
+        bot_controller, bot, _ = setup_bot_controller
+        bot.strategy.get_formatted_orders = Mock(return_value=[])
+        bot_controller.logger = Mock()
 
         await bot_controller.command_listener()
 
-        trading_performance_analyzer.get_formatted_orders.assert_called_once()
+        bot.strategy.get_formatted_orders.assert_called_once()
 
     @patch("builtins.input", side_effect=["restart", "quit"])
     async def test_command_listener_restart(self, mock_input, setup_bot_controller):
-        bot_controller, strategy, _, _ = setup_bot_controller
-        strategy.restart = AsyncMock()
+        bot_controller, bot, event_bus = setup_bot_controller
+        bot.restart = AsyncMock()
+
+        # Mock the event bus to simulate the behavior of triggering bot restart
+        async def mock_publish(event, reason):
+            if event == Events.START_BOT:
+                await bot.restart()
+
+        event_bus.publish = AsyncMock(side_effect=mock_publish)
 
         await bot_controller.command_listener()
 
-        strategy.restart.assert_called_once()
+        bot.restart.assert_called_once()
+        event_bus.publish.assert_any_call(Events.STOP_BOT, "User issued restart command")
+        event_bus.publish.assert_any_call(Events.START_BOT, "User issued restart command")
 
     @patch("builtins.input", side_effect=["pause 2", "quit"])
     @patch("asyncio.sleep", new_callable=AsyncMock)  # Patch asyncio.sleep to skip actual delay
     async def test_command_listener_pause_valid(self, mock_sleep, mock_input, setup_bot_controller):
-        bot_controller, strategy, _, _ = setup_bot_controller
-        strategy.stop = AsyncMock()
-        strategy.restart = AsyncMock()
+        bot_controller, bot, event_bus = setup_bot_controller
+        bot.stop = AsyncMock()
+        bot.restart = AsyncMock()
+
+        # Mock the event bus to simulate bot stop and restart
+        async def mock_publish(event, reason):
+            if event == Events.STOP_BOT:
+                await bot.stop()
+            elif event == Events.START_BOT:
+                await bot.restart()
+
+        event_bus.publish = AsyncMock(side_effect=mock_publish)
 
         await bot_controller.command_listener()
 
-        assert strategy.stop.call_count >= 1, "Expected 'stop' to be called at least once during pause"
+        assert bot.stop.call_count == 1, "Expected 'stop' to be called once during pause"
         mock_sleep.assert_awaited_once_with(2)  # Ensure sleep was called with the correct duration
-        strategy.restart.assert_called_once_with()
+        bot.restart.assert_called_once()
 
     @patch("builtins.input", side_effect=["unknown", "quit"])
     @patch("core.bot_management.bot_controller.bot_controller.logging.Logger.warning")
     async def test_command_listener_unknown_command(self, mock_log_warning, mock_input, setup_bot_controller):
-        bot_controller, _, _, _ = setup_bot_controller
+        bot_controller, _, _ = setup_bot_controller
 
         await bot_controller.command_listener()
 
-        mock_log_warning.assert_any_call('Command error: Unknown command: unknown')
+        mock_log_warning.assert_any_call("Command error: Unknown command: unknown")
     
     @patch("builtins.input", side_effect=["orders", "quit"])
     async def test_handle_command_order_retrieval_error(self, mock_input, setup_bot_controller):
-        bot_controller, _, _, trading_performance_analyzer = setup_bot_controller
-        trading_performance_analyzer.get_formatted_orders.side_effect = Exception("Order error")
-        
+        bot_controller, bot, _ = setup_bot_controller
+        bot.strategy.get_formatted_orders.side_effect = Exception("Order error")
+
         with pytest.raises(OrderRetrievalError):
             await bot_controller._display_orders()
     
     @patch("builtins.input", side_effect=["balance", "quit"])
     async def test_handle_command_balance_retrieval_error(self, mock_input, setup_bot_controller):
-        bot_controller, _, balance_tracker, _ = setup_bot_controller
-        balance_tracker.balance = None  # Simulate error condition for balance retrieval
-        
+        bot_controller, bot, _ = setup_bot_controller
+        bot.balance_tracker.balance = None  # Simulate error condition for balance retrieval
+
         with pytest.raises(BalanceRetrievalError):
             await bot_controller._display_balance()

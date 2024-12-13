@@ -86,23 +86,39 @@ class GridTradingStrategy(TradingStrategy):
 
         async def on_ticker_update(current_price):
             nonlocal last_price, grid_orders_initialized
-            
-            if not self._running:
-                self.logger.info("Trading stopped; halting price updates.")
-                return
-            
-            grid_orders_initialized = await self._initialize_grid_orders_once(current_price, trigger_price, grid_orders_initialized)
+            try:
+                if not self._running:
+                    self.logger.info("Trading stopped; halting price updates.")
+                    return
+                
+                grid_orders_initialized = await self._initialize_grid_orders_once(current_price, trigger_price, grid_orders_initialized)
 
-            if not grid_orders_initialized:
-                return
+                if not grid_orders_initialized:
+                    self.logger.info("Grid orders initialization not done yet.")
+                    return
 
-            if await self._check_take_profit_stop_loss(current_price):
-                self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
-                await self.event_bus.publish(Events.STOP_BOT, "TP or SL hit.")
-                return
+                if await self._check_take_profit_stop_loss(current_price):
+                    self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
+                    await self.event_bus.publish(Events.STOP_BOT, "TP or SL hit.")
+                    return
 
-            last_price = current_price
-        await self.exchange_service.listen_to_ticker_updates(self.pair, on_ticker_update, self.TICKER_REFRESH_INTERVAL)
+                last_price = current_price
+
+            except Exception as e:
+                self.logger.error(f"Error during ticker update: {e}", exc_info=True)
+        
+        try:
+            await self.exchange_service.listen_to_ticker_updates(
+                self.pair, 
+                on_ticker_update, 
+                self.TICKER_REFRESH_INTERVAL
+            )
+        
+        except Exception as e:
+            self.logger.error(f"Error in live/paper trading loop: {e}", exc_info=True)
+        
+        finally:
+            self.logger.info("Exiting live/paper trading loop.")
 
     async def _run_backtest(self, trigger_price: float) -> None:
         if self.data is None:

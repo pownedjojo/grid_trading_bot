@@ -37,15 +37,15 @@ class TestOrderStatusTracker:
     async def test_process_open_orders_failure(self, setup_tracker):
         tracker, order_book, order_execution_strategy, _ = setup_tracker
         mock_order = Mock(identifier="order_1", status=OrderStatus.OPEN)
-    
+
         order_book.get_open_orders.return_value = [mock_order]
         order_execution_strategy.get_order = AsyncMock(side_effect=Exception("Failed to fetch order"))
-    
+
         with patch.object(tracker.logger, "error") as mock_logger_error:
             await tracker._process_open_orders()
-    
+
             order_execution_strategy.get_order.assert_awaited_once_with("order_1")
-            mock_logger_error.assert_called_once_with("Failed to query status for order order_1: Failed to fetch order")
+            mock_logger_error.assert_called_once_with("Failed to query status for order order_1: Failed to fetch order", exc_info=True)
 
     def test_handle_order_status_change_closed(self, setup_tracker):
         tracker, order_book, _, event_bus = setup_tracker
@@ -73,12 +73,16 @@ class TestOrderStatusTracker:
             mock_logger_warning.assert_any_call("Order order_1 was canceled.")
 
     def test_handle_order_status_change_unknown_status(self, setup_tracker):
-        tracker, _, _, event_bus = setup_tracker
+        tracker, _, _, _ = setup_tracker
         mock_local_order = Mock(identifier="order_1")
         mock_remote_order = Mock(identifier="order_1", status=OrderStatus.UNKNOWN)
 
-        with pytest.raises(ValueError, match="Order data from the exchange is missing the 'status' field."):
+        with patch.object(tracker.logger, "error") as mock_logger_error:
             tracker._handle_order_status_change(mock_local_order, mock_remote_order)
+
+            mock_logger_error.assert_any_call(f"Missing 'status' in remote order object: {mock_remote_order}", exc_info=True)
+            mock_logger_error.assert_any_call("Error handling order status change: Order data from the exchange is missing the 'status' field.", exc_info=True)
+            assert mock_logger_error.call_count == 2
 
     def test_handle_order_status_change_open(self, setup_tracker):
         tracker, _, _, _ = setup_tracker

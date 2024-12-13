@@ -135,7 +135,7 @@ class GridTradingBot:
         self.logger.info("Stopping Grid Trading Bot...")
 
         try:
-            self.order_status_tracker.stop_tracking()
+            await self.order_status_tracker.stop_tracking()
             await self.strategy.stop()
             self.is_running = False
 

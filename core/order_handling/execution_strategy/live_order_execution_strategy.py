@@ -1,4 +1,4 @@
-import time, logging, asyncio
+import logging, asyncio
 from typing import Optional
 from ..order import Order, OrderType, OrderSide, OrderStatus
 from core.services.exchange_interface import ExchangeInterface

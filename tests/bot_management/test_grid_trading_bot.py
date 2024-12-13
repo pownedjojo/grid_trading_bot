@@ -181,12 +181,12 @@ class TestGridTradingBot:
     async def test_stop_bot(self, mock_order_status_tracker, bot):
         bot.is_running = True
         bot.strategy.stop = AsyncMock()
-        bot.order_status_tracker.stop_tracking = Mock()
+        bot.order_status_tracker.stop_tracking = AsyncMock()
 
         await bot._stop()
 
         bot.strategy.stop.assert_awaited_once()
-        bot.order_status_tracker.stop_tracking.assert_called_once()
+        bot.order_status_tracker.stop_tracking.assert_awaited_once()
         bot.event_bus.publish_sync.assert_called_once_with(Events.STOP_BOT, "Bot stopped")
 
     async def test_restart_bot(self, bot):

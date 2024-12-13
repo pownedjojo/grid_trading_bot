@@ -1,7 +1,7 @@
-import pytest
+import pytest, ccxt
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from core.services.live_exchange_service import LiveExchangeService
-from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError
+from core.services.exceptions import UnsupportedExchangeError, MissingEnvironmentVariableError, DataFetchError, OrderCancellationError
 from config.config_manager import ConfigManager
 from config.trading_mode import TradingMode
 
@@ -209,3 +209,16 @@ class TestLiveExchangeService:
         assert result["status"] == "error"
         assert "Failed to fetch exchange status" in result["info"]
         assert "Network error" in result["info"]
+
+    @pytest.mark.asyncio
+    @patch("core.services.live_exchange_service.ccxt")
+    @patch("core.services.live_exchange_service.getattr")
+    async def test_close_connection(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars, mock_exchange_instance):
+        mock_getattr.return_value = mock_ccxt.binance
+        mock_ccxt.binance.return_value = mock_exchange_instance
+        service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
+
+        service.connection_active = True
+
+        await service.close_connection()
+        assert service.connection_active is False

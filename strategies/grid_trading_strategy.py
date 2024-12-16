@@ -91,17 +91,20 @@ class GridTradingStrategy(TradingStrategy):
                     self.logger.info("Trading stopped; halting price updates.")
                     return
                 
-                grid_orders_initialized = await self._initialize_grid_orders_once(current_price, trigger_price, grid_orders_initialized)
+                grid_orders_initialized = await self._initialize_grid_orders_once(
+                    current_price, 
+                    trigger_price, 
+                    grid_orders_initialized, 
+                    last_price
+                )
 
                 if not grid_orders_initialized:
-                    self.logger.info("Grid orders initialization not done yet.")
+                    last_price = current_price
                     return
 
-                if await self._check_take_profit_stop_loss(current_price):
-                    self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
-                    await self.event_bus.publish(Events.STOP_BOT, "TP or SL hit.")
+                if await self._handle_take_profit_stop_loss(current_price):
                     return
-
+                
                 last_price = current_price
 
             except Exception as e:
@@ -133,39 +136,52 @@ class GridTradingStrategy(TradingStrategy):
         timestamps = self.data.index
         self.data.loc[timestamps[0], 'account_value'] = self.config_manager.get_initial_balance()
         grid_orders_initialized = False
+        last_price = None
 
         for i, (current_price, high_price, low_price, timestamp) in enumerate(zip(self.close_prices, self.high_prices, self.low_prices, timestamps)):
-            grid_orders_initialized = await self._initialize_grid_orders_once(current_price, trigger_price, grid_orders_initialized)
+            grid_orders_initialized = await self._initialize_grid_orders_once(
+                current_price, 
+                trigger_price,
+                grid_orders_initialized,
+                last_price
+            )
 
             if not grid_orders_initialized:
                 self.data.loc[timestamps[i], 'account_value'] = self.config_manager.get_initial_balance()
+                last_price = current_price
                 continue
 
             await self.order_manager.simulate_order_fills(high_price, low_price, timestamp)
 
-            if await self._check_take_profit_stop_loss(current_price):
+            if await self._handle_take_profit_stop_loss(current_price):
                 break
 
             self.data.loc[timestamp, 'account_value'] = self.balance_tracker.get_total_balance_value(current_price)
+            last_price = current_price
     
     async def _initialize_grid_orders_once(
         self, 
         current_price: float, 
         trigger_price: float, 
-        grid_orders_initialized: bool
+        grid_orders_initialized: bool,
+        last_price: Optional[float] = None
     ) -> bool:
         if grid_orders_initialized:
             return True
-
-        if current_price < trigger_price:
-            self.logger.debug(f"Current price {current_price} below trigger price {trigger_price}. Waiting.")
+        
+        if last_price is None:
+            self.logger.debug("No previous price recorded yet. Waiting for the next price update.")
             return False
 
-        self.logger.info(f"Current price {current_price} reached trigger price {trigger_price}. Will perform initial purhcase")
-        await self.order_manager.perform_initial_purchase(current_price)
-        self.logger.info(f"Initial purchase done, will initialize grid orders")
-        await self.order_manager.initialize_grid_orders(current_price)
-        return True
+        if last_price <= trigger_price <= current_price or last_price == trigger_price:
+            self.logger.info(f"Current price {current_price} reached trigger price {trigger_price}. Will perform initial purhcase")
+            await self.order_manager.perform_initial_purchase(current_price)
+            self.logger.info(f"Initial purchase done, will initialize grid orders")
+            await self.order_manager.initialize_grid_orders(current_price)
+            return True
+
+        self.logger.info(f"Current price {current_price} did not cross trigger price {trigger_price}. Last price: {last_price}.")
+        return False
 
     def generate_performance_report(self) -> Tuple[dict, list]:
         final_price = self.close_prices[-1]
@@ -182,6 +198,13 @@ class GridTradingStrategy(TradingStrategy):
             self.plotter.plot_results(self.data)
         else:
             self.logger.info("Plotting is not available for live/paper trading mode.")
+    
+    async def _handle_take_profit_stop_loss(self, current_price: float) -> bool:
+        if await self._check_take_profit_stop_loss(current_price):
+            self.logger.info("Take-profit or stop-loss triggered, ending trading session.")
+            await self.event_bus.publish(Events.STOP_BOT, "TP or SL hit.")
+            return True
+        return False
 
     async def _check_take_profit_stop_loss(
         self, 

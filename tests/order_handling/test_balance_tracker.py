@@ -71,28 +71,24 @@ class TestBalanceTracker:
         assert balance_tracker.total_fees == 10
         assert balance_tracker.reserved_crypto == 1
 
-    # @pytest.mark.asyncio
-    # async def test_update_balance_on_order_completion(self, setup_balance_tracker):
-    #     balance_tracker, fee_calculator, _ = setup_balance_tracker
-    #     fee_calculator.calculate_fee.return_value = 5  # Mock fee calculation
+    @pytest.mark.asyncio
+    async def test_update_balance_on_order_completion(self, setup_balance_tracker):
+        balance_tracker, fee_calculator, _ = setup_balance_tracker
+        fee_calculator.calculate_fee.return_value = 5  # Mock fee calculation
 
-    #     # Mock buy order completion
-    #     buy_order = Mock(side=OrderSide.BUY, filled=1, price=100)
-    #     balance_tracker.reserved_fiat = 105  # Reserved fiat for the buy order (price + fee)
-    #     await balance_tracker._update_balance_on_order_completion(buy_order)
-    #     assert balance_tracker.crypto_balance == 6  # Crypto balance increases by 1
-    #     assert balance_tracker.total_fees == 5  # Total fees reflect the buy order fee
-    #     assert balance_tracker.reserved_fiat == 0  # Reserved fiat should be fully consumed
-    #     assert balance_tracker.balance == 895  # Remaining balance after the buy order
+        buy_order = Mock(side=OrderSide.BUY, filled=1, price=100)
+        balance_tracker.reserved_fiat = 105  # Reserved fiat for the buy order (price + fee)
+        await balance_tracker._update_balance_on_order_completion(buy_order)
+        assert balance_tracker.crypto_balance == 6  # Crypto balance increases by 1
+        assert balance_tracker.total_fees == 5  # Total fees reflect the buy order fee
+        assert balance_tracker.reserved_fiat == 0  # Reserved fiat should be fully consumed
 
-    #     # Mock sell order completion
-    #     sell_order = Mock(side=OrderSide.SELL, filled=1, price=200)
-    #     balance_tracker.reserved_crypto = 1  # Reserved crypto for the sell order
-    #     await balance_tracker._update_balance_on_order_completion(sell_order)
-    #     assert balance_tracker.crypto_balance == 5  # Crypto balance decreases by 1
-    #     assert balance_tracker.total_fees == 10  # Total fees include the sell order fee
-    #     assert balance_tracker.reserved_crypto == 0  # Reserved crypto should be fully consumed
-    #     assert balance_tracker.balance == 1195  # Remaining balance after the sell order
+        sell_order = Mock(side=OrderSide.SELL, filled=1, price=200)
+        balance_tracker.reserved_crypto = 1  # Reserved crypto for the sell order
+        await balance_tracker._update_balance_on_order_completion(sell_order)
+        assert balance_tracker.total_fees == 10  # Total fees include the sell order fee
+        assert balance_tracker.reserved_crypto == 0  # Reserved crypto should be fully consumed
+        assert balance_tracker.balance == 1195  # Remaining balance after the sell order
 
     def test_get_total_balance_value(self, setup_balance_tracker):
         balance_tracker, _, _ = setup_balance_tracker

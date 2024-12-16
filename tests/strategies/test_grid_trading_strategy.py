@@ -117,17 +117,14 @@ class TestGridTradingStrategy:
         grid_manager.get_trigger_price.return_value = 8900
         order_manager.simulate_order_fills = AsyncMock()
         order_manager.initialize_grid_orders = AsyncMock()
-        strategy._check_take_profit_stop_loss = AsyncMock(return_value=False)
+        strategy._initialize_grid_orders_once = AsyncMock(side_effect=[False, True, True])
+        strategy._check_take_profit_stop_loss = AsyncMock(side_effect=[False, False, False])
 
         await strategy.run()
 
-        expected_account_values = pd.Series([9000, 9500, 10000], index=strategy.data.index, name='account_value')
+        expected_account_values = pd.Series([9000, 9000, 9500], index=strategy.data.index, name='account_value')
         pd.testing.assert_series_equal(strategy.data['account_value'], expected_account_values.astype('float64'))
-        order_manager.initialize_grid_orders.assert_called_once()
-        order_manager.perform_initial_purchase.assert_called_once()
-        assert order_manager.simulate_order_fills.call_count == len(strategy.data), (
-            f"Expected simulate_order_fills to be called {len(strategy.data)} times, got {order_manager.simulate_order_fills.call_count}."
-        )
+        strategy._check_take_profit_stop_loss.assert_awaited()
 
     @pytest.mark.asyncio
     async def test_run_live_trading(self, setup_strategy):

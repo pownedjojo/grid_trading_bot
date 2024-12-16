@@ -12,7 +12,7 @@ from core.bot_management.health_check import HealthCheck
 from config.config_manager import ConfigManager
 from config.config_validator import ConfigValidator
 from config.exceptions import ConfigError
-from utils.logging_config import setup_logging
+from utils.log_management.logging_config import setup_logging
 
 def initialize_config(config_path: str) -> ConfigManager:
     load_dotenv()
@@ -35,7 +35,7 @@ async def run_bot(
     no_plot: bool = False
 ) -> Optional[Dict[str, Any]]:
     config_manager = initialize_config(config_path)
-    setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_filename())
+    setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_file_path())
     event_bus = EventBus()
     notification_handler = initialize_notification_handler(config_manager, event_bus)
     bot = GridTradingBot(config_path, config_manager, notification_handler, event_bus, save_performance_results_path, no_plot)

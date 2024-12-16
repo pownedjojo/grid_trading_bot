@@ -159,10 +159,10 @@ class ConfigManager:
         logging = self.get_logging()
         return logging.get('log_level', {})
     
-    def should_log_to_file(self):
+    def should_log_to_file(self) -> bool:
         logging = self.get_logging()
         return logging.get('log_to_file', False)
 
-    def get_log_filename(self):
+    def get_log_file_path(self) -> str:
         logging = self.get_logging()
-        return logging.get('log_filename', 'grid_trading_bot.log')
+        return logging.get('log_file_path', '/logs/grid_trading_bot.log')

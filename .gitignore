@@ -49,8 +49,12 @@ secrets.json
 conda_packages.txt
 
 # Project specific
-grid_trading_bot.log
 /data/
+logs/*
+
+# Ignore docker-compose and promtail configurations
+docker-compose.yml
+promtail-config.yml
 
 # Secrets
 .env

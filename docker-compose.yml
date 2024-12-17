@@ -1,0 +1,68 @@
+services:
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki.yaml    
+    volumes:
+      - ./monitoring/configs/loki/loki.yaml:/etc/loki/loki.yaml
+      - ./monitoring/configs/loki/rules.yaml:/etc/loki/rules
+      - loki-data:/tmp/loki/chunks
+    cpus: 0.5
+    mem_limit: 512m
+    networks:
+      - default
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_DEFAULT_THEME=dark
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=debug
+      - GF_PANELS_ENABLE_ALPHA=false
+      - GF_FEATURE_TOGGLES_ENABLE=lokiLogsDataplane
+      - GF_INSTALL_PLUGINS=grafana-polystat-panel
+    volumes:
+      - ./monitoring/configs/grafana/provisioning/datasources.yml:/etc/grafana/provisioning/datasources/provisioning-datasources.yaml:ro
+      - ./monitoring/configs/grafana/provisioning/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/dashboards/grid_trading_bot_dashboard.json:/var/lib/grafana/dashboards/grid_trading_bot_dashboard.json:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+    cpus: 0.5
+    mem_limit: 512m
+    networks:
+      - default
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/configs/promtail/promtail.yaml:/etc/promtail/promtail.yaml
+      - ./logs:/var/log/grid_trading_bot:ro
+      - promtail-positions:/tmp
+    command: -config.file=/etc/promtail/promtail.yaml
+    depends_on:
+      - loki
+    cpus: 0.5
+    mem_limit: 512m
+    networks:
+      - default
+
+volumes:
+  grafana-data:
+    driver: local
+  loki-data:
+    driver: local
+  promtail-positions:
+    driver: local

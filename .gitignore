@@ -52,9 +52,7 @@ conda_packages.txt
 /data/
 logs/*
 
-# Ignore docker-compose and promtail configurations
-docker-compose.yml
-promtail-config.yml
-
 # Secrets
 .env
+loki-data/
+grafana-data/

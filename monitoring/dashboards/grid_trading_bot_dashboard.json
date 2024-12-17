@@ -1,0 +1,118 @@
+{
+  "id": null,
+  "uid": "grid_trading_bot_dashboard",
+  "title": "Grid Trading Bot Monitoring",
+  "tags": ["grid_trading_bot", "monitoring"],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Bot Uptime",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{job=\"grid_trading_bot\"} |= \"Bot started successfully\"",
+          "legendFormat": "Uptime",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 3 }
+    },
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "Error Logs",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{job=\"grid_trading_bot\"} |= \"ERROR\"",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 4, "y": 0, "w": 8, "h": 6 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Total Account Value",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{job=\"grid_trading_bot\"} |= \"Account value\" | json | __value__=Account value",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 3, "w": 12, "h": 6 }
+    },
+    {
+      "id": 4,
+      "type": "piechart",
+      "title": "Orders by Status",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{job=\"grid_trading_bot\"} |= \"Order status\" | json | order_status",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 6 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Error Count Over Time",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "count_over_time({job=\"grid_trading_bot\"} |= \"ERROR\" [1m])",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 6, "w": 6, "h": 6 }
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Completed Orders",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{job=\"grid_trading_bot\"} |= \"Order status: FILLED\"",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 6 }
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Open Orders",
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{job=\"grid_trading_bot\"} |= \"Order status: OPEN\"",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 6 }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": []
+  },
+  "variables": {
+    "list": []
+  }
+}

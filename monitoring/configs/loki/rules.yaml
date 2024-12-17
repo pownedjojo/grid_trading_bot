@@ -1,0 +1,12 @@
+groups:
+  - name: log-rules
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate({job="grid_trading_bot", level="error"}[5m])) > 0.01
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+            summary: High error rate detected in logs
+            description: "High error rate detected in logs for job {{ $labels.job }} is above 0.01."

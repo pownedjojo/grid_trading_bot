@@ -20,4 +20,4 @@ def generate_config_name(config_manager: ConfigManager) -> str:
     grid_bottom = config_manager.get_bottom_range()
     start_time = datetime.now().strftime("%Y%m%d_%H%M")
 
-    return f"{trading_pair}_{trading_mode}_strategy{grid_strategy_type}_spacing{grid_spacing_type}_size{grid_size}_range{grid_bottom}-{grid_top}_{start_time}"
+    return f"bot_{trading_pair}_{trading_mode}_strategy{grid_strategy_type}_spacing{grid_spacing_type}_size{grid_size}_range{grid_bottom}-{grid_top}_{start_time}"

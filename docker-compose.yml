@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./monitoring/configs/promtail/promtail.yaml:/etc/promtail/promtail.yaml
-      - ./logs:/var/log/grid_trading_bot:ro
+      - ./logs:/logs:ro
       - promtail-positions:/tmp
     command: -config.file=/etc/promtail/promtail.yaml
     depends_on:

@@ -15,4 +15,4 @@ scrape_configs:
           - localhost
         labels:
           job: grid_trading_bot
-          __path__: /var/log/grid_trading_bot/**/*.log
+          __path__: /logs/**/*.log

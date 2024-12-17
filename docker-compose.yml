@@ -3,12 +3,13 @@ services:
     image: grafana/loki:3.0.0
     container_name: loki
     restart: unless-stopped
+    user: "10001:10001"
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/loki.yaml    
     volumes:
       - ./monitoring/configs/loki/loki.yaml:/etc/loki/loki.yaml
-      - ./monitoring/configs/loki/rules.yaml:/etc/loki/rules
+      - ./monitoring/configs/loki/rules.yaml:/etc/loki/rules/fake/loki-rules.yml
       - loki-data:/tmp/loki/chunks
     cpus: 0.5
     mem_limit: 512m

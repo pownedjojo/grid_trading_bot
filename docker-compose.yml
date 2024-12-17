@@ -3,7 +3,7 @@ services:
     image: grafana/loki:3.0.0
     container_name: loki
     restart: unless-stopped
-    user: "10001:10001"
+    user: root
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/loki.yaml    

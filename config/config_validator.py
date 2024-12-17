@@ -199,10 +199,6 @@ class ConfigValidator:
             self.logger.error("log_to_file must be a boolean.")
             invalid_fields.append('logging.log_to_file')
 
-        # Validate log file path
-        if logging_settings.get('log_to_file') and not logging_settings.get('log_file_path'):
-            missing_fields.append('logging.log_file_path')
-
         if missing_fields:
             self.logger.error(f"Missing logging fields: {missing_fields}")
         

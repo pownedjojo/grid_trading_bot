@@ -120,8 +120,7 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
   },
   "logging": {
     "log_level": "INFO",
-    "log_to_file": true,
-    "log_file_path": "logs/trading_SOL_120_130.log"
+    "log_to_file": true
   }
 }
 ```
@@ -165,7 +164,6 @@ Configure the bot by editing the `config/config.json` file to your needs. Here i
 - **logging**: Configures logging settings.
   - **log_level**: The logging level (e.g., `INFO`, `DEBUG`).
   - **log_to_file**: Enables logging to a file.
-  - **log_file_path**: The file path for log storage.
 
 ## Running the Bot
 

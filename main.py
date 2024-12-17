@@ -37,7 +37,7 @@ async def run_bot(
 ) -> Optional[Dict[str, Any]]:
     config_manager = initialize_config(config_path)
     config_name = generate_config_name(config_manager)
-    setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_manager.get_log_file_path(), config_name)
+    setup_logging(config_manager.get_logging_level(), config_manager.should_log_to_file(), config_name)
     event_bus = EventBus()
     notification_handler = initialize_notification_handler(config_manager, event_bus)
     bot = GridTradingBot(config_path, config_manager, notification_handler, event_bus, save_performance_results_path, no_plot)

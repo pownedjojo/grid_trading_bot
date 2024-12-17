@@ -108,18 +108,14 @@ class TestConfigValidator:
     def test_validate_logging_invalid_level(self, config_validator, valid_config):
         valid_config['logging'] = {
             'log_level': 'VERBOSE',  # Invalid log level
-            'log_to_file': True,
-            'log_file_path': 'logs/trading.log'
+            'log_to_file': True
         }
         with pytest.raises(ConfigValidationError) as excinfo:
             config_validator.validate(valid_config)
         assert 'logging.log_level' in excinfo.value.invalid_fields
 
     def test_validate_logging_missing_level(self, config_validator, valid_config):
-        valid_config['logging'] = {
-            'log_to_file': True,
-            'log_file_path': 'logs/trading.log'  # Missing log_level
-        }
+        valid_config['logging'] = {'log_to_file': True}
         with pytest.raises(ConfigValidationError) as excinfo:
             config_validator.validate(valid_config)
         assert 'logging.log_level' in excinfo.value.missing_fields

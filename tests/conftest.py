@@ -42,7 +42,6 @@ def valid_config():
         },
         "logging": {
             "log_level": "INFO",
-            "log_to_file": True,
-            "log_file_path": "logs/trading.log"
+            "log_to_file": True
         }
     }

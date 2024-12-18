@@ -1,6 +1,5 @@
 import ccxt, logging, time, os
 from typing import Optional, Dict, Any, Union
-from ccxt.okx import OrderSide
 import pandas as pd
 from config.config_manager import ConfigManager
 from utils.constants import CANDLE_LIMITS, TIMEFRAME_MAPPINGS

@@ -16,8 +16,6 @@ class TestLiveExchangeService:
     @pytest.fixture
     def mock_exchange_instance(self):
         exchange = AsyncMock()
-        exchange.create_limit_buy_order.return_value = {"status": "filled"}
-        exchange.create_limit_sell_order.return_value = {"status": "filled"}
         exchange.fetch_balance.return_value = {"total": {"USD": 1000}}
         exchange.fetch_ticker.return_value = {"last": 50000.0}
         exchange.fetch_order.return_value = {"status": "closed"}
@@ -96,18 +94,18 @@ class TestLiveExchangeService:
 
         mock_exchange_instance.create_order.assert_called_once_with("BTC/USD",  "limit", "buy", 1, 50000.0)
 
+    @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio
-    async def test_place_order_unexpected_error(self, mock_getattr, config_manager, setup_env_vars):
-        mock_exchange_instance = AsyncMock()
-
-        mock_exchange_instance.create_limit_buy_order.side_effect = Exception("Unexpected error")
-        mock_getattr.return_value = mock_exchange_instance
-
+    async def test_place_order_unexpected_error(self, mock_getattr, mock_ccxt, config_manager, setup_env_vars, mock_exchange_instance):
+        mock_getattr.return_value = mock_ccxt.binance
+        mock_ccxt.binance.return_value = mock_exchange_instance
+        mock_exchange_instance.create_order.side_effect = Exception("Unexpected error")
         service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
 
         with pytest.raises(DataFetchError, match="Unexpected error placing order"):
-            await service.place_order("BTC/USD", "buy", "market", 1, 50000.0)
+            await service.place_order("BTC/USD", "market", "buy", 1, 50000.0)
+        mock_exchange_instance.create_order.assert_awaited_once_with("BTC/USD", "market", "buy", 1, 50000.0)
 
     @patch("core.services.live_exchange_service.ccxt")
     @patch("core.services.live_exchange_service.getattr")

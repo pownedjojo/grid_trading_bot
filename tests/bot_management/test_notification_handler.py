@@ -1,10 +1,10 @@
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, Mock
 from core.order_handling.order import Order, OrderStatus, OrderType, OrderSide
 from core.bot_management.notification.notification_handler import NotificationHandler
 from core.bot_management.notification.notification_content import NotificationType
 from config.trading_mode import TradingMode
-from core.bot_management.event_bus import EventBus, Events
+from core.bot_management.event_bus import EventBus
 
 
 class TestNotificationHandler:
@@ -114,7 +114,7 @@ class TestNotificationHandler:
     @pytest.mark.asyncio
     async def test_async_send_notification_success(self, notification_handler_enabled):
         handler = notification_handler_enabled
-        handler.send_notification = AsyncMock()
+        handler.send_notification = Mock()
 
         await handler.async_send_notification("Async notification message")
 

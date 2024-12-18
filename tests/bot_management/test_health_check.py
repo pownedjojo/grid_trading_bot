@@ -57,15 +57,15 @@ class TestHealthCheck(unittest.IsolatedAsyncioTestCase):
 
     async def test_perform_checks_success(self):
         self.bot.get_bot_health_status = AsyncMock(return_value={"strategy": True, "exchange_status": "ok"})
-        self.health_check._check_ressource_usage = Mock(return_value={"cpu": 10, "memory": 10, "disk": 10})
+        self.health_check._check_resource_usage = Mock(return_value={"cpu": 10, "memory": 10, "disk": 10})
 
         self.health_check._check_and_alert_bot_health = AsyncMock()
-        self.health_check._check_and_alert_ressource_usage = AsyncMock()
+        self.health_check._check_and_alert_resource_usage = AsyncMock()
 
         await self.health_check._perform_checks()
 
         self.health_check._check_and_alert_bot_health.assert_awaited_with({"strategy": True, "exchange_status": "ok"})
-        self.health_check._check_and_alert_ressource_usage.assert_awaited_with({"cpu": 10, "memory": 10, "disk": 10})
+        self.health_check._check_and_alert_resource_usage.assert_awaited_with({"cpu": 10, "memory": 10, "disk": 10})
 
     async def test_check_and_alert_bot_health_with_alerts(self):
         health_status = {"strategy": False, "exchange_status": "maintenance"}
@@ -83,20 +83,20 @@ class TestHealthCheck(unittest.IsolatedAsyncioTestCase):
 
         self.health_check._send_alert.assert_not_awaited()
 
-    async def test_check_and_alert_ressource_usage_with_alerts(self):
+    async def test_check_and_alert_resource_usage_with_alerts(self):
         usage = {"cpu": 95, "memory": 85, "disk": 10}
         self.health_check._send_alert = AsyncMock()
 
-        await self.health_check._check_and_alert_ressource_usage(usage)
+        await self.health_check._check_and_alert_resource_usage(usage)
 
         expected_message = "CPU usage is high: 95% (Threshold: 90%) | MEMORY usage is high: 85% (Threshold: 80%)"
         self.health_check._send_alert.assert_awaited_once_with(expected_message)
 
-    async def test_check_and_alert_ressource_usage_no_alerts(self):
+    async def test_check_and_alert_resource_usage_no_alerts(self):
         usage = {"cpu": 10, "memory": 10, "disk": 10}
         self.health_check._send_alert = AsyncMock()
 
-        await self.health_check._check_and_alert_ressource_usage(usage)
+        await self.health_check._check_and_alert_resource_usage(usage)
 
         self.health_check._send_alert.assert_not_awaited()
 
@@ -110,7 +110,7 @@ class TestHealthCheck(unittest.IsolatedAsyncioTestCase):
         mock_process.return_value.cpu_percent.return_value = 20
         mock_process.return_value.memory_percent.return_value = 30
 
-        usage = self.health_check._check_ressource_usage()
+        usage = self.health_check._check_resource_usage()
 
         self.assertEqual(usage["cpu"], 95)
         self.assertEqual(usage["memory"], 85)

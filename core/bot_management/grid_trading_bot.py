@@ -1,6 +1,7 @@
 import logging, traceback
 from typing import Optional, Dict, Any
 from core.services.exchange_service_factory import ExchangeServiceFactory
+from strategies.strategy_type import StrategyType
 from strategies.grid_trading_strategy import GridTradingStrategy
 from strategies.plotter import Plotter
 from strategies.trading_performance_analyzer import TradingPerformanceAnalyzer
@@ -38,16 +39,27 @@ class GridTradingBot:
             self.save_performance_results_path = save_performance_results_path
             self.no_plot = no_plot
             self.logger = logging.getLogger(self.__class__.__name__)
-            self.trading_mode = self.config_manager.get_trading_mode()
-            self.logger.info(f"Starting Grid Trading Bot in {self.trading_mode.value} mode")
+            self.trading_mode: TradingMode = self.config_manager.get_trading_mode()
+            base_currency: str = self.config_manager.get_base_currency()
+            quote_currency: str = self.config_manager.get_quote_currency()
+            trading_pair = f"{base_currency}/{quote_currency}"
+            strategy_type: StrategyType = self.config_manager.get_strategy_type()
+            self.logger.info(f"Starting Grid Trading Bot in {self.trading_mode.value} mode with strategy: {strategy_type.value}")
             self.is_running = False
 
             self.exchange_service = ExchangeServiceFactory.create_exchange_service(self.config_manager, self.trading_mode)
             order_execution_strategy = OrderExecutionStrategyFactory.create(self.config_manager, self.exchange_service)
-            grid_manager = GridManager(self.config_manager)
+            grid_manager = GridManager(self.config_manager, strategy_type)
             order_validator = OrderValidator()
             fee_calculator = FeeCalculator(self.config_manager)
-            self.balance_tracker = BalanceTracker(self.event_bus, fee_calculator, self.config_manager.get_initial_balance(), 0)
+
+            self.balance_tracker = BalanceTracker(
+                event_bus=self.event_bus,
+                fee_calculator=fee_calculator,
+                trading_mode=self.trading_mode,
+                base_currency=base_currency,
+                quote_currency=quote_currency
+            )
             order_book = OrderBook()
 
             self.order_status_tracker = OrderStatusTracker(
@@ -58,14 +70,16 @@ class GridTradingBot:
             )
 
             order_manager = OrderManager(
-                self.config_manager,
                 grid_manager,
                 order_validator,
                 self.balance_tracker,
                 order_book,
                 self.event_bus,
                 order_execution_strategy,
-                self.notification_handler
+                self.notification_handler,
+                self.trading_mode,
+                trading_pair,
+                strategy_type
             )
             
             trading_performance_analyzer = TradingPerformanceAnalyzer(self.config_manager, order_book)
@@ -78,12 +92,15 @@ class GridTradingBot:
                 order_manager,
                 self.balance_tracker,
                 trading_performance_analyzer,
+                self.trading_mode,
+                trading_pair,
                 plotter
             )
 
         except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
             self.logger.error(f"{type(e).__name__}: {e}")
-            exit(1)            
+            exit(1)   
+
         except Exception as e:
             self.logger.error("An unexpected error occurred.")
             self.logger.error(traceback.format_exc())
@@ -93,6 +110,12 @@ class GridTradingBot:
         try:
             self.is_running = True
 
+            await self.balance_tracker.setup_balances(
+                initial_balance=self.config_manager.get_initial_balance(),
+                initial_crypto_balance=0.0,
+                exchange_service=self.exchange_service
+            )
+
             self.order_status_tracker.start_tracking()
             self.strategy.initialize_strategy()
             await self.strategy.run()
@@ -100,8 +123,7 @@ class GridTradingBot:
             if not self.no_plot:
                 self.strategy.plot_results()
 
-            if self.trading_mode == TradingMode.BACKTEST:
-                return self._generate_and_log_performance()
+            return self._generate_and_log_performance()
 
         except Exception as e:
             self.logger.error(f"An unexpected error occurred {e}")
@@ -189,8 +211,10 @@ class GridTradingBot:
         exchange_status = await self.exchange_service.get_exchange_status()
         return exchange_status.get("status", "unknown")
     
-    async def get_balance(self) -> Dict[str, float]:
+    def get_balances(self) -> Dict[str, float]:
         return {
             "fiat": self.balance_tracker.balance,
+            "reserved_fiat": self.balance_tracker.reserved_fiat,
             "crypto": self.balance_tracker.crypto_balance,
+            "reserved_crypto": self.balance_tracker.reserved_crypto
         }

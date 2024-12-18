@@ -25,6 +25,8 @@ class GridTradingStrategy(TradingStrategy):
         order_manager: OrderManager,
         balance_tracker: BalanceTracker,
         trading_performance_analyzer: TradingPerformanceAnalyzer,
+        trading_mode: TradingMode,
+        trading_pair: str,
         plotter: Optional[Plotter] = None
     ):
         super().__init__(config_manager, balance_tracker)
@@ -34,26 +36,25 @@ class GridTradingStrategy(TradingStrategy):
         self.grid_manager = grid_manager
         self.order_manager = order_manager
         self.trading_performance_analyzer = trading_performance_analyzer
+        self.trading_mode = trading_mode
+        self.trading_pair = trading_pair
         self.plotter = plotter
-        self.trading_mode = self.config_manager.get_trading_mode()
         self.data = self._initialize_data() if self.trading_mode == TradingMode.BACKTEST else None
-        self.pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
         self._running = True
     
     def _initialize_data(self) -> Optional[pd.DataFrame]:
         try:
-            pair, timeframe, start_date, end_date = self._extract_config()
-            return self.exchange_service.fetch_ohlcv(pair, timeframe, start_date, end_date)
+            timeframe, start_date, end_date = self._extract_config()
+            return self.exchange_service.fetch_ohlcv(self.trading_pair, timeframe, start_date, end_date)
         except Exception as e:
             self.logger.error(f"Failed to initialize data for backtest trading mode: {e}")
             return None
     
-    def _extract_config(self) -> Tuple[str, str, str, str]:
-        pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
+    def _extract_config(self) -> Tuple[str, str, str]:
         timeframe = self.config_manager.get_timeframe()
         start_date = self.config_manager.get_start_date()
         end_date = self.config_manager.get_end_date()
-        return pair, timeframe, start_date, end_date
+        return timeframe, start_date, end_date
 
     def initialize_strategy(self):
         self.grid_manager.initialize_grids_and_levels()
@@ -112,7 +113,7 @@ class GridTradingStrategy(TradingStrategy):
         
         try:
             await self.exchange_service.listen_to_ticker_updates(
-                self.pair, 
+                self.trading_pair, 
                 on_ticker_update, 
                 self.TICKER_REFRESH_INTERVAL
             )
@@ -134,7 +135,7 @@ class GridTradingStrategy(TradingStrategy):
         self.high_prices = self.data['high'].values
         self.low_prices = self.data['low'].values
         timestamps = self.data.index
-        self.data.loc[timestamps[0], 'account_value'] = self.config_manager.get_initial_balance()
+        self.data.loc[timestamps[0], 'account_value'] = self.balance_tracker.get_total_balance_value(price=self.close_prices[0])
         grid_orders_initialized = False
         last_price = None
 
@@ -147,7 +148,7 @@ class GridTradingStrategy(TradingStrategy):
             )
 
             if not grid_orders_initialized:
-                self.data.loc[timestamps[i], 'account_value'] = self.config_manager.get_initial_balance()
+                self.data.loc[timestamps[i], 'account_value'] = self.balance_tracker.get_total_balance_value(price=current_price)
                 last_price = current_price
                 continue
 
@@ -184,14 +185,17 @@ class GridTradingStrategy(TradingStrategy):
         return False
 
     def generate_performance_report(self) -> Tuple[dict, list]:
-        final_price = self.close_prices[-1]
-        return self.trading_performance_analyzer.generate_performance_summary(
-            self.data, 
-            self.balance_tracker.get_adjusted_fiat_balance(), 
-            self.balance_tracker.get_adjusted_crypto_balance(), 
-            final_price,
-            self.balance_tracker.total_fees
-        )
+        if self.trading_mode == TradingMode.BACKTEST:
+            final_price = self.close_prices[-1]
+            return self.trading_performance_analyzer.generate_performance_summary(
+                self.data, 
+                self.balance_tracker.get_adjusted_fiat_balance(), 
+                self.balance_tracker.get_adjusted_crypto_balance(), 
+                final_price,
+                self.balance_tracker.total_fees
+            )
+        else:
+            self.logger.info("Performance report is not available for live/paper trading mode.")
 
     def plot_results(self) -> None:
         if self.trading_mode == TradingMode.BACKTEST:

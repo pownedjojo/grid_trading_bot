@@ -3,7 +3,6 @@ from typing import Union, Optional
 import pandas as pd
 from .order import Order, OrderSide, OrderStatus
 from ..order_handling.balance_tracker import BalanceTracker
-from config.config_manager import ConfigManager
 from ..order_handling.order_book import OrderBook
 from ..grid_management.grid_manager import GridManager
 from ..grid_management.grid_level import GridLevel
@@ -19,17 +18,18 @@ from .exceptions import OrderExecutionFailedError
 class OrderManager:
     def __init__(
         self, 
-        config_manager: ConfigManager, 
         grid_manager: GridManager,
         order_validator: OrderValidator, 
         balance_tracker: BalanceTracker, 
         order_book: OrderBook,
         event_bus: EventBus,
         order_execution_strategy: OrderExecutionStrategy,
-        notification_handler: NotificationHandler
+        notification_handler: NotificationHandler,
+        trading_mode: TradingMode,
+        trading_pair: str,
+        strategy_type: StrategyType
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.config_manager = config_manager
         self.grid_manager = grid_manager
         self.order_validator = order_validator
         self.balance_tracker = balance_tracker
@@ -37,9 +37,9 @@ class OrderManager:
         self.event_bus = event_bus
         self.order_execution_strategy = order_execution_strategy
         self.notification_handler = notification_handler
-        self.trading_mode = self.config_manager.get_trading_mode()
-        self.pair = f"{self.config_manager.get_base_currency()}/{self.config_manager.get_quote_currency()}"
-        self.strategy_type: StrategyType = self.config_manager.get_strategy_type()
+        self.trading_mode: TradingMode = trading_mode
+        self.trading_pair = trading_pair
+        self.strategy_type: StrategyType = strategy_type
         self.event_bus.subscribe(Events.ORDER_COMPLETED, self._on_order_completed)
     
     async def initialize_grid_orders(
@@ -55,17 +55,24 @@ class OrderManager:
                 continue
 
             grid_level = self.grid_manager.grid_levels[price]
+            total_balance_value = self.balance_tracker.get_total_balance_value(current_price)
+            order_quantity = self.grid_manager.get_order_size_for_grid_level(total_balance_value, current_price)
 
             if self.grid_manager.can_place_order(grid_level, OrderSide.BUY):
                 try:
                     adjusted_buy_order_quantity = self.order_validator.adjust_and_validate_buy_quantity(
                         balance=self.balance_tracker.balance,
-                        order_quantity=self.grid_manager.get_order_size_for_grid_level(price),
+                        order_quantity=order_quantity,
                         price=price
                     )
 
-                    self.logger.info(f"Placing initial buy limit order at grid level {price} for {adjusted_buy_order_quantity} {self.pair}.")
-                    order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, adjusted_buy_order_quantity, price)
+                    self.logger.info(f"Placing initial buy limit order at grid level {price} for {adjusted_buy_order_quantity} {self.trading_pair}.")
+                    order = await self.order_execution_strategy.execute_limit_order(
+                        OrderSide.BUY, 
+                        self.trading_pair, 
+                        adjusted_buy_order_quantity, 
+                        price
+                    )
 
                     if order is None:
                         self.logger.error(f"Failed to place buy order at {price}: No order returned.")
@@ -89,16 +96,23 @@ class OrderManager:
                 continue
 
             grid_level = self.grid_manager.grid_levels[price]
+            total_balance_value = self.balance_tracker.get_total_balance_value(current_price)
+            order_quantity = self.grid_manager.get_order_size_for_grid_level(total_balance_value, current_price)
 
             if self.grid_manager.can_place_order(grid_level, OrderSide.SELL):
                 try:
                     adjusted_sell_order_quantity = self.order_validator.adjust_and_validate_sell_quantity(
                         crypto_balance=self.balance_tracker.crypto_balance,
-                        order_quantity=self.grid_manager.get_order_size_for_grid_level(price)
+                        order_quantity=order_quantity
                     )
 
-                    self.logger.info(f"Placing initial sell limit order at grid level {price} for {adjusted_sell_order_quantity} {self.pair}.")
-                    order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, adjusted_sell_order_quantity, price)
+                    self.logger.info(f"Placing initial sell limit order at grid level {price} for {adjusted_sell_order_quantity} {self.trading_pair}.")
+                    order = await self.order_execution_strategy.execute_limit_order(
+                        OrderSide.SELL, 
+                        self.trading_pair, 
+                        adjusted_sell_order_quantity, 
+                        price
+                    )
 
                     if order is None:
                         self.logger.error(f"Failed to place sell order at {price}: No order returned.")
@@ -249,7 +263,12 @@ class OrderManager:
             quantity: The quantity of the buy order.
         """
         adjusted_quantity = self.order_validator.adjust_and_validate_buy_quantity(self.balance_tracker.balance, quantity, buy_grid_level.price)
-        buy_order = await self.order_execution_strategy.execute_limit_order(OrderSide.BUY, self.pair, adjusted_quantity, buy_grid_level.price)
+        buy_order = await self.order_execution_strategy.execute_limit_order(
+            OrderSide.BUY, 
+            self.trading_pair, 
+            adjusted_quantity, 
+            buy_grid_level.price
+        )
 
         if buy_order:
             self.grid_manager.pair_grid_levels(sell_grid_level, buy_grid_level, pairing_type="buy")
@@ -273,7 +292,12 @@ class OrderManager:
             quantity: The quantity of the sell order.
         """
         adjusted_quantity = self.order_validator.adjust_and_validate_sell_quantity(self.balance_tracker.crypto_balance, quantity)
-        sell_order = await self.order_execution_strategy.execute_limit_order(OrderSide.SELL, self.pair, adjusted_quantity, sell_grid_level.price)
+        sell_order = await self.order_execution_strategy.execute_limit_order(
+            OrderSide.SELL, 
+            self.trading_pair, 
+            adjusted_quantity, 
+            sell_grid_level.price
+        )
 
         if sell_order:
             self.grid_manager.pair_grid_levels(buy_grid_level, sell_grid_level, pairing_type="sell")
@@ -293,7 +317,11 @@ class OrderManager:
         Args:
             current_price: The current price of the trading pair.
         """
-        initial_quantity = self.grid_manager.get_initial_order_quantity(current_price)
+        initial_quantity = self.grid_manager.get_initial_order_quantity(
+            current_fiat_balance=self.balance_tracker.balance,
+            current_crypto_balance=self.balance_tracker.crypto_balance,
+            current_price=current_price
+        )
         
         if initial_quantity <= 0:
             self.logger.warning("Initial purchase quantity is zero or negative. Skipping initial purchase.")
@@ -302,7 +330,12 @@ class OrderManager:
         self.logger.info(f"Performing initial crypto purchase: {initial_quantity} at price {current_price}.")
 
         try:
-            buy_order = await self.order_execution_strategy.execute_market_order(OrderSide.BUY, self.pair, initial_quantity, current_price)
+            buy_order = await self.order_execution_strategy.execute_market_order(
+                OrderSide.BUY, 
+                self.trading_pair, 
+                initial_quantity, 
+                current_price
+            )
             self.logger.info(f"Initial crypto purchase completed. Order details: {buy_order}")
 
             if buy_order is not None and self.trading_mode == TradingMode.BACKTEST:
@@ -340,7 +373,7 @@ class OrderManager:
         event = "Take profit" if take_profit_order else "Stop loss"
         try:
             quantity = self.balance_tracker.crypto_balance
-            order = await self.order_execution_strategy.execute_market_order(OrderSide.SELL, self.pair, quantity, current_price)
+            order = await self.order_execution_strategy.execute_market_order(OrderSide.SELL, self.trading_pair, quantity, current_price)
 
             if not order:
                 self.logger.error(f"Order execution failed: {order}")

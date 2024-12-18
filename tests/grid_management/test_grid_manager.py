@@ -5,6 +5,7 @@ from config.config_manager import ConfigManager
 from core.grid_management.grid_manager import GridManager
 from core.grid_management.grid_level import GridLevel, GridCycleState
 from core.order_handling.order import Order, OrderSide
+from strategies import strategy_type
 from strategies.spacing_type import SpacingType
 from strategies.strategy_type import StrategyType
 
@@ -12,17 +13,15 @@ class TestGridManager:
     @pytest.fixture
     def config_manager(self):
         mock_config_manager = Mock(spec=ConfigManager)
-        mock_config_manager.get_initial_balance.return_value = 10000
         mock_config_manager.get_bottom_range.return_value = 1000
         mock_config_manager.get_top_range.return_value = 2000
         mock_config_manager.get_num_grids.return_value = 10
         mock_config_manager.get_spacing_type.return_value = SpacingType.ARITHMETIC
-        mock_config_manager.get_strategy_type.return_value = StrategyType.SIMPLE_GRID
         return mock_config_manager
 
     @pytest.fixture
     def grid_manager(self, config_manager):
-        return GridManager(config_manager)
+        return GridManager(config_manager, StrategyType.SIMPLE_GRID)
 
     def test_initialize_grids_and_levels_simple_grid(self, grid_manager):
         grid_manager.initialize_grids_and_levels()
@@ -36,8 +35,7 @@ class TestGridManager:
                 assert grid_level.state == GridCycleState.READY_TO_SELL
 
     def test_initialize_grids_and_levels_hedged_grid(self, config_manager):
-        config_manager.get_strategy_type.return_value = StrategyType.HEDGED_GRID
-        grid_manager = GridManager(config_manager)
+        grid_manager = GridManager(config_manager, StrategyType.HEDGED_GRID)
 
         grid_manager.initialize_grids_and_levels()
         assert len(grid_manager.grid_levels) == len(grid_manager.price_grids)
@@ -56,14 +54,17 @@ class TestGridManager:
     def test_get_order_size_for_grid_level(self, grid_manager):
         grid_manager.initialize_grids_and_levels()
         current_price = 2000
-        expected_order_size = grid_manager.initial_balance / len(grid_manager.grid_levels) / current_price
-        result = grid_manager.get_order_size_for_grid_level(current_price)
+        total_balance = 10000  # Mocked initial balance
+        expected_order_size = total_balance / len(grid_manager.grid_levels) / current_price
+        result = grid_manager.get_order_size_for_grid_level(total_balance, current_price)
         assert result == expected_order_size
 
     def test_get_initial_order_quantity(self, grid_manager):
+        current_fiat_balance = 5000  # Half of the total balance
+        current_crypto_balance = 0.5
         current_price = 2000
-        expected_quantity = (grid_manager.initial_balance / 2) / current_price
-        result = grid_manager.get_initial_order_quantity(current_price)
+        expected_quantity = ((current_fiat_balance + (current_crypto_balance * current_price)) / 2 - (current_crypto_balance * current_price)) / current_price
+        result = grid_manager.get_initial_order_quantity(current_fiat_balance, current_crypto_balance, current_price)
         assert result == expected_quantity
 
     def test_pair_grid_levels(self, grid_manager):
@@ -110,8 +111,7 @@ class TestGridManager:
         assert grid_level.state == GridCycleState.READY_TO_SELL
 
     def test_complete_order_hedged_grid(self, config_manager):
-        config_manager.get_strategy_type.return_value = StrategyType.HEDGED_GRID
-        grid_manager = GridManager(config_manager)
+        grid_manager = GridManager(config_manager, StrategyType.HEDGED_GRID)
         grid_manager.initialize_grids_and_levels()
 
         grid_level = grid_manager.grid_levels[grid_manager.sorted_buy_grids[0]]
@@ -127,8 +127,7 @@ class TestGridManager:
         assert grid_manager.can_place_order(sell_grid_level, OrderSide.SELL) is True
 
     def test_can_place_order_hedged_grid(self, config_manager):
-        config_manager.get_strategy_type.return_value = StrategyType.HEDGED_GRID
-        grid_manager = GridManager(config_manager)
+        grid_manager = GridManager(config_manager, StrategyType.HEDGED_GRID)
         grid_manager.initialize_grids_and_levels()
 
         buy_grid_level = grid_manager.grid_levels[grid_manager.sorted_buy_grids[0]]
@@ -147,7 +146,7 @@ class TestGridManager:
         config_manager.get_spacing_type.return_value = SpacingType.GEOMETRIC
         config_manager.get_top_range.return_value = 2000
         config_manager.get_bottom_range.return_value = 1000
-        grid_manager = GridManager(config_manager)
+        grid_manager = GridManager(config_manager, StrategyType.HEDGED_GRID)
 
         expected_grids = [
             1000, 1080.059738892306, 1166.5290395761165, 1259.921049894873, 

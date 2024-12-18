@@ -1,17 +1,21 @@
 import logging
 from typing import List, Optional, Tuple
 import numpy as np
+from config.config_manager import ConfigManager
 from strategies.strategy_type import StrategyType
 from strategies.spacing_type import SpacingType
 from .grid_level import GridLevel, GridCycleState
 from ..order_handling.order import Order, OrderSide
 
 class GridManager:
-    def __init__(self, config_manager):
+    def __init__(
+        self, 
+        config_manager: ConfigManager, 
+        strategy_type: StrategyType
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.config_manager = config_manager
-        self.initial_balance: float = self.config_manager.get_initial_balance()
-        self.strategy_type: StrategyType = self.config_manager.get_strategy_type()
+        self.config_manager: ConfigManager = config_manager
+        self.strategy_type: StrategyType = strategy_type
         self.price_grids: List[float]
         self.central_price: float
         self.sorted_buy_grids: List[float]
@@ -56,12 +60,13 @@ class GridManager:
 
     def get_order_size_for_grid_level(
         self,
+        total_balance: float,
         current_price: float
     ) -> float:
         """
-        Calculates the order size for a grid level based on the initial balance, total grids, and current price.
+        Calculates the order size for a grid level based on the total balance, total grids, and current price.
 
-        The order size is determined by evenly distributing the initial balance across all grid levels and adjusting 
+        The order size is determined by evenly distributing the total balance across all grid levels and adjusting 
         it to reflect the current price.
 
         Args:
@@ -71,21 +76,32 @@ class GridManager:
             The calculated order size as a float.
         """
         total_grids = len(self.grid_levels)
-        order_size = self.initial_balance / total_grids / current_price
+        order_size = total_balance / total_grids / current_price
         return order_size
-    
-    def get_initial_order_quantity(self, current_price: float) -> float:
+
+    def get_initial_order_quantity(
+        self, 
+        current_fiat_balance: float, 
+        current_crypto_balance: float,
+        current_price: float
+    ) -> float:
         """
         Calculates the initial quantity of crypto to purchase for grid initialization.
 
         Args:
-            current_price: The current market price.
+            current_fiat_balance (float): The current fiat balance.
+            current_crypto_balance (float): The current crypto balance.
+            current_price (float): The current market price of the crypto.
 
         Returns:
-            The quantity of crypto to purchase.
+            float: The quantity of crypto to purchase.
         """
-        initial_allocation = self.initial_balance / 2  # Allocate 50% of balance for initial buy
-        return initial_allocation / current_price
+        current_crypto_value_in_fiat = current_crypto_balance * current_price
+        total_portfolio_value = current_fiat_balance + current_crypto_value_in_fiat
+        target_crypto_allocation_in_fiat = total_portfolio_value / 2 # Allocate 50% of balance for initial buy
+        fiat_to_allocate_for_purchase = target_crypto_allocation_in_fiat - current_crypto_value_in_fiat
+        fiat_to_allocate_for_purchase = max(0, min(fiat_to_allocate_for_purchase, current_fiat_balance))
+        return fiat_to_allocate_for_purchase / current_price
 
     def pair_grid_levels(
         self, 

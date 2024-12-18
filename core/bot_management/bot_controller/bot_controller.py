@@ -2,7 +2,7 @@ import logging, asyncio
 from tabulate import tabulate
 from core.bot_management.event_bus import EventBus, Events
 from core.bot_management.grid_trading_bot import GridTradingBot
-from .exceptions import CommandParsingError, BalanceRetrievalError, OrderRetrievalError, StrategyControlError
+from .exceptions import CommandParsingError, StrategyControlError
 
 class BotController:
     """
@@ -97,30 +97,16 @@ class BotController:
         """
         Displays formatted orders retrieved from the bot.
         """
-        try:
-            formatted_orders = self.bot.strategy.get_formatted_orders()
-            orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
-            self.logger.info("\nFormatted Orders:\n" + orders_table)
-
-        except Exception as e:
-            raise OrderRetrievalError(f"Error retrieving orders: {e}")
+        formatted_orders = self.bot.strategy.get_formatted_orders()
+        orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Status", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
+        self.logger.info("\nFormatted Orders:\n" + orders_table)
 
     async def _display_balance(self):
         """
         Displays the current balances retrieved from the bot.
         """
-        try:
-            current_balance = self.bot.balance_tracker.balance
-            crypto_balance = self.bot.balance_tracker.crypto_balance
-
-            if current_balance is None or crypto_balance is None:
-                raise BalanceRetrievalError("Invalid balance data retrieved.")
-
-            self.logger.info(f"Current Fiat balance: {current_balance}")
-            self.logger.info(f"Current Crypto balance: {crypto_balance}")
-
-        except Exception as e:
-            raise BalanceRetrievalError(f"Error retrieving balance: {e}")
+        current_balances = self.bot.get_balances()
+        self.logger.info(f"Current balances: {current_balances}")
 
     async def _pause_bot(self, command: str):
         """

@@ -1,26 +1,90 @@
 import logging
+from config.trading_mode import TradingMode
 from .fee_calculator import FeeCalculator
 from .order import Order, OrderSide
 from core.bot_management.event_bus import EventBus, Events
-from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError 
+from ..validation.exceptions import InsufficientBalanceError, InsufficientCryptoBalanceError
+from core.services.exchange_interface import ExchangeInterface
 
 class BalanceTracker:
     def __init__(
         self, 
         event_bus: EventBus,
         fee_calculator: FeeCalculator, 
-        initial_balance: float, 
-        initial_crypto_balance: float = 0
+        trading_mode: TradingMode,
+        base_currency: str,
+        quote_currency: str,
     ):
+        """
+        Initializes the BalanceTracker.
+
+        Args:
+            event_bus: The event bus instance for subscribing to events.
+            fee_calculator: The fee calculator instance for calculating trading fees.
+            trading_mode: "BACKTEST", "LIVE" or "PAPER_TRADING".
+            base_currency: The base currency symbol.
+            quote_currency: The quote currency symbol.
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.event_bus = event_bus
-        self.fee_calculator = fee_calculator
-        self.balance: float = initial_balance
-        self.crypto_balance: float = initial_crypto_balance
+        self.event_bus: EventBus = event_bus
+        self.fee_calculator: FeeCalculator = fee_calculator
+        self.trading_mode: TradingMode = trading_mode
+        self.base_currency: str = base_currency
+        self.quote_currency: str = quote_currency
+
+        self.balance: float = 0.0
+        self.crypto_balance: float = 0.0
         self.total_fees: float = 0
-        self.reserved_fiat = 0.0
-        self.reserved_crypto = 0.0
+        self.reserved_fiat: float = 0.0
+        self.reserved_crypto: float = 0.0
+
         self.event_bus.subscribe(Events.ORDER_COMPLETED, self._update_balance_on_order_completion)
+    
+    async def setup_balances(
+        self, 
+        initial_balance: float, 
+        initial_crypto_balance: float, 
+        exchange_service=ExchangeInterface
+    ):
+        """
+        Sets up the balances based on trading mode.
+
+        For BACKTEST mode, sets initial balances.
+        For LIVE and PAPER_TRADING modes, fetches balances dynamically from the exchange.
+
+        Args:
+            initial_balance: The initial fiat balance for backtest mode.
+            initial_crypto_balance: The initial crypto balance for backtest mode.
+            exchange_service: The exchange instance (required for live and paper_trading trading).
+        """
+        if self.trading_mode == TradingMode.BACKTEST:
+            self.balance = initial_balance
+            self.crypto_balance = initial_crypto_balance
+        elif self.trading_mode == TradingMode.LIVE or self.trading_mode == TradingMode.PAPER_TRADING:
+            self.balance, self.crypto_balance = await self._fetch_live_balances(exchange_service)
+
+    async def _fetch_live_balances(
+        self, 
+        exchange_service: ExchangeInterface
+    )-> tuple[float, float]:
+        """
+        Fetches live balances from the exchange asynchronously.
+
+        Args:
+            exchange_service: The exchange instance.
+
+        Returns:
+            tuple: The quote and base currency balances.
+        """
+        balances = await exchange_service.get_balance()
+
+        if not balances or 'free' not in balances:
+            raise ValueError(f"Unexpected balance structure: {balances}")
+
+        quote_balance = float(balances.get('free', {}).get(self.quote_currency, 0.0))
+        base_balance = float(balances.get('free', {}).get(self.base_currency, 0.0))
+        self.logger.info(f"Fetched balances - Quote: {self.quote_currency}: {quote_balance}, Base: {self.base_currency}: {base_balance}")
+        return quote_balance, base_balance
 
     async def _update_balance_on_order_completion(self, order: Order) -> None:
         """

@@ -9,7 +9,7 @@ def generate_config_name(config_manager: ConfigManager) -> str:
         config_manager (ConfigManager): Config manager instance to retrieve key parameters.
 
     Returns:
-        str: A descriptive configuration name including trading pair, mode, grid range, and timestamp.
+        str: A descriptive configuration name including trading pair, mode, strategy, grid spacing, grid range, and timestamp.
     """
     trading_pair = f"{config_manager.get_base_currency()}_{config_manager.get_quote_currency()}"
     trading_mode = config_manager.get_trading_mode().name

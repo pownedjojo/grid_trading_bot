@@ -1,4 +1,5 @@
 import ccxt, logging, asyncio, os
+from ccxt.base.errors import NetworkError, BaseError, ExchangeError, OrderNotFound
 import ccxt.pro as ccxtpro
 from typing import Dict, Union, Callable, Any, Optional
 import pandas as pd
@@ -73,11 +74,11 @@ class LiveExchangeService(ExchangeInterface):
                 await on_ticker_update(current_price)
                 await asyncio.sleep(update_interval)
 
-            except ccxt.NetworkError as e:
+            except NetworkError as e:
                 self.logger.error(f"Network error while connecting to WebSocket: {e}. Retrying in 5 seconds...")
                 await asyncio.sleep(5)
 
-            except ccxt.ExchangeError as e:
+            except ExchangeError as e:
                 self.logger.error(f"Exchange error while fetching ticker for {pair}: {e}. Retrying in 5 seconds...")
                 await asyncio.sleep(5)
 
@@ -107,7 +108,7 @@ class LiveExchangeService(ExchangeInterface):
             self.logger.info(f"Retrieved balance: {balance}")
             return balance
 
-        except ccxt.BaseError as e:
+        except BaseError as e:
             raise DataFetchError(f"Error fetching balance: {str(e)}")
     
     async def get_current_price(self, pair: str) -> float:
@@ -115,7 +116,7 @@ class LiveExchangeService(ExchangeInterface):
             ticker = await self.exchange.fetch_ticker(pair)
             return ticker['last']
 
-        except ccxt.BaseError as e:
+        except BaseError as e:
             raise DataFetchError(f"Error fetching current price: {str(e)}")
 
     async def place_order(
@@ -130,10 +131,10 @@ class LiveExchangeService(ExchangeInterface):
             order = await self.exchange.create_order(pair, order_type, order_side, amount, price)
             return order
 
-        except ccxt.NetworkError as e:
+        except NetworkError as e:
             raise DataFetchError(f"Network issue occurred while placing order: {str(e)}")
 
-        except ccxt.BaseError as e:
+        except BaseError as e:
             raise DataFetchError(f"Error placing order: {str(e)}")
 
         except Exception as e:
@@ -147,10 +148,10 @@ class LiveExchangeService(ExchangeInterface):
         try:
             return await self.exchange.fetch_order(order_id, pair)
 
-        except ccxt.NetworkError as e:
+        except NetworkError as e:
             raise DataFetchError(f"Network issue occurred while fetching order status: {str(e)}")
 
-        except ccxt.BaseError as e:
+        except BaseError as e:
             raise DataFetchError(f"Exchange-specific error occurred: {str(e)}")
 
         except Exception as e:
@@ -172,13 +173,13 @@ class LiveExchangeService(ExchangeInterface):
                 self.logger.warning(f"Order {order_id} cancellation status: {cancellation_result['status']}")
                 return cancellation_result
 
-        except ccxt.OrderNotFound as e:
+        except OrderNotFound as e:
             raise OrderCancellationError(f"Order {order_id} not found for cancellation. It may already be completed or canceled.")
 
-        except ccxt.NetworkError as e:
+        except NetworkError as e:
             raise OrderCancellationError(f"Network error while canceling order {order_id}: {str(e)}")
 
-        except ccxt.BaseError as e:
+        except BaseError as e:
             raise OrderCancellationError(f"Exchange error while canceling order {order_id}: {str(e)}")
 
         except Exception as e:

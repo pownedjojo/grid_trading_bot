@@ -3,7 +3,6 @@ from unittest.mock import Mock, patch, AsyncMock
 from core.bot_management.event_bus import EventBus, Events
 from core.bot_management.grid_trading_bot import GridTradingBot
 from core.bot_management.bot_controller.bot_controller import BotController
-from core.bot_management.bot_controller.exceptions import BalanceRetrievalError, OrderRetrievalError
 from core.order_handling.balance_tracker import BalanceTracker
 from strategies.grid_trading_strategy import GridTradingStrategy
 
@@ -35,24 +34,43 @@ class TestBotController:
     @patch("builtins.input", side_effect=["balance", "quit"])
     async def test_command_listener_balance_positive(self, mock_input, setup_bot_controller):
         bot_controller, bot, _ = setup_bot_controller
+        bot.balance_tracker = Mock()
+        bot.balance_tracker.balance = 1000.0
+        bot.balance_tracker.reserved_fiat = 200.0
+        bot.balance_tracker.crypto_balance = 2.0
+        bot.balance_tracker.reserved_crypto = 0.5
         bot_controller.logger = Mock()
+        bot.get_balances = Mock(return_value={
+            "fiat": bot.balance_tracker.balance,
+            "reserved_fiat": bot.balance_tracker.reserved_fiat,
+            "crypto": bot.balance_tracker.crypto_balance,
+            "reserved_crypto": bot.balance_tracker.reserved_crypto,
+        })
 
         await bot_controller.command_listener()
 
-        bot_controller.logger.info.assert_any_call(f"Current Fiat balance: {bot.balance_tracker.balance}")
-        bot_controller.logger.info.assert_any_call(f"Current Crypto balance: {bot.balance_tracker.crypto_balance}")
+        bot.get_balances.assert_called_once()
+        bot_controller.logger.info.assert_any_call(f"Current balances: {bot.get_balances.return_value}")
 
     @patch("builtins.input", side_effect=["balance", "quit"])
     async def test_command_listener_balance_zero_negative(self, mock_input, setup_bot_controller):
         bot_controller, bot, _ = setup_bot_controller
         bot.balance_tracker.balance = 0.0
         bot.balance_tracker.crypto_balance = -0.5
+        bot.balance_tracker.reserved_fiat = 0.0
+        bot.balance_tracker.reserved_crypto = 0.0
+        bot.get_balances = Mock(return_value={
+            "fiat": bot.balance_tracker.balance,
+            "reserved_fiat": bot.balance_tracker.reserved_fiat,
+            "crypto": bot.balance_tracker.crypto_balance,
+            "reserved_crypto": bot.balance_tracker.reserved_crypto,
+        })
         bot_controller.logger = Mock()
 
         await bot_controller.command_listener()
 
-        bot_controller.logger.info.assert_any_call(f"Current Fiat balance: 0.0")
-        bot_controller.logger.info.assert_any_call(f"Current Crypto balance: -0.5")
+        bot.get_balances.assert_called_once()
+        bot_controller.logger.info.assert_any_call(f"Current balances: {bot.get_balances.return_value}")
 
     @patch("builtins.input", side_effect=["orders", "quit"])
     async def test_command_listener_orders_with_orders(self, mock_input, setup_bot_controller):
@@ -124,19 +142,3 @@ class TestBotController:
         await bot_controller.command_listener()
 
         mock_log_warning.assert_any_call("Command error: Unknown command: unknown")
-    
-    @patch("builtins.input", side_effect=["orders", "quit"])
-    async def test_handle_command_order_retrieval_error(self, mock_input, setup_bot_controller):
-        bot_controller, bot, _ = setup_bot_controller
-        bot.strategy.get_formatted_orders.side_effect = Exception("Order error")
-
-        with pytest.raises(OrderRetrievalError):
-            await bot_controller._display_orders()
-    
-    @patch("builtins.input", side_effect=["balance", "quit"])
-    async def test_handle_command_balance_retrieval_error(self, mock_input, setup_bot_controller):
-        bot_controller, bot, _ = setup_bot_controller
-        bot.balance_tracker.balance = None  # Simulate error condition for balance retrieval
-
-        with pytest.raises(BalanceRetrievalError):
-            await bot_controller._display_balance()

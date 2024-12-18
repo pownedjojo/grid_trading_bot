@@ -13,7 +13,6 @@ def mock_env_vars():
     with patch.dict(os.environ, {"EXCHANGE_API_KEY": "test_api_key", "EXCHANGE_SECRET_KEY": "test_secret_key"}):
         yield
 
-@pytest.mark.asyncio
 class TestGridTradingBot:
     @pytest.fixture
     def config_manager(self):
@@ -111,6 +110,7 @@ class TestGridTradingBot:
             logger_instance.error.assert_any_call("An unexpected error occurred.")
             logger_instance.error.assert_any_call(unittest.mock.ANY)
 
+    @pytest.mark.asyncio
     async def test_get_bot_health_status(self, bot):
         bot._check_strategy_health = AsyncMock(return_value=True)
         bot._get_exchange_status = AsyncMock(return_value="ok")
@@ -121,6 +121,7 @@ class TestGridTradingBot:
         assert health_status["exchange_status"] == "ok"
         assert health_status["overall"] is True
 
+    @pytest.mark.asyncio
     async def test_is_healthy_strategy_stopped(self, bot):
         bot.strategy = Mock()
         bot.strategy._running = False
@@ -133,6 +134,7 @@ class TestGridTradingBot:
         assert health_status["overall"] is False
 
     @patch("core.bot_management.grid_trading_bot.GridTradingBot._generate_and_log_performance")
+    @pytest.mark.asyncio
     async def test_generate_and_log_performance_direct(self, mock_performance, bot):
         mock_performance.return_value = {
             "config": bot.config_path,
@@ -148,6 +150,7 @@ class TestGridTradingBot:
             "orders": []
         }
 
+    @pytest.mark.asyncio
     async def test_get_exchange_status(self, bot):
         bot.exchange_service = MagicMock()
         bot.exchange_service.get_exchange_status = AsyncMock(return_value={"status": "ok"})
@@ -155,16 +158,27 @@ class TestGridTradingBot:
         result = await bot._get_exchange_status()
         assert result == "ok"
 
-    async def test_get_balance_zero_values(self, bot):
+    def test_get_balance_zero_values(self, bot):
+        bot.balance_tracker = Mock()
         bot.balance_tracker.balance = 0.0
+        bot.balance_tracker.reserved_fiat = 0.0
         bot.balance_tracker.crypto_balance = 0.0
+        bot.balance_tracker.reserved_crypto = 0.0
 
-        result = await bot.get_balance()
+        result = bot.get_balances()
 
-        assert result == {"fiat": 0.0, "crypto": 0.0}
+        assert result == {
+            "fiat": 0.0,
+            "crypto": 0.0,
+            "reserved_fiat": 0.0,
+            "reserved_crypto": 0.0,
+        }
     
     @patch("core.bot_management.grid_trading_bot.GridTradingStrategy")
-    async def test_run_with_exception(self, mock_strategy, bot):
+    @pytest.mark.asyncio
+    async def test_run_strategy_with_exception(self, mock_strategy, bot):
+        bot.balance_tracker = Mock()
+        bot.balance_tracker.setup_balances = AsyncMock()
         bot.order_status_tracker.start_tracking = Mock()
         bot.strategy.run = AsyncMock(side_effect=Exception("Test Exception"))
         mock_grid_manager = Mock()
@@ -176,8 +190,10 @@ class TestGridTradingBot:
                 await bot.run()
             
             mock_logger_error.assert_any_call("An unexpected error occurred Test Exception")
+        assert bot.is_running is False
 
     @patch("core.bot_management.grid_trading_bot.OrderStatusTracker")
+    @pytest.mark.asyncio
     async def test_stop_bot(self, mock_order_status_tracker, bot):
         bot.is_running = True
         bot.strategy.stop = AsyncMock()
@@ -189,6 +205,7 @@ class TestGridTradingBot:
         bot.order_status_tracker.stop_tracking.assert_awaited_once()
         bot.event_bus.publish_sync.assert_called_once_with(Events.STOP_BOT, "Bot stopped")
 
+    @pytest.mark.asyncio
     async def test_restart_bot(self, bot):
         bot.is_running = True
         bot.strategy.restart = AsyncMock()
@@ -201,6 +218,7 @@ class TestGridTradingBot:
         bot.strategy.restart.assert_awaited_once()
         bot.order_status_tracker.start_tracking.assert_called_once()
 
+    @pytest.mark.asyncio
     async def test_restart_when_not_running(self, bot):
         bot.is_running = False
         bot._stop = AsyncMock()
@@ -212,7 +230,8 @@ class TestGridTradingBot:
         bot._stop.assert_not_awaited()
         bot.strategy.restart.assert_awaited_once()
         bot.order_status_tracker.start_tracking.assert_called_once()
-    
+
+    @pytest.mark.asyncio
     async def test_handle_stop_bot_event(self, bot):
         bot.is_running = True
         bot._stop = AsyncMock()
@@ -221,6 +240,7 @@ class TestGridTradingBot:
 
         bot._stop.assert_awaited_once()
 
+    @pytest.mark.asyncio
     async def test_handle_stop_bot_event_when_already_stopped(self, bot):
         bot.is_running = False
         bot._stop = AsyncMock()
@@ -229,6 +249,7 @@ class TestGridTradingBot:
 
         bot._stop.assert_not_awaited()
 
+    @pytest.mark.asyncio
     async def test_handle_start_bot_event_when_already_running(self, bot):
         bot.is_running = True
         bot.restart = AsyncMock()
@@ -237,6 +258,7 @@ class TestGridTradingBot:
 
         bot.restart.assert_not_awaited()
 
+    @pytest.mark.asyncio
     async def test_handle_start_bot_event(self, bot):
         bot.is_running = False
         bot.restart = AsyncMock()
@@ -246,8 +268,11 @@ class TestGridTradingBot:
         bot.restart.assert_awaited_once()
     
     @patch("core.bot_management.grid_trading_bot.GridTradingStrategy")
+    @pytest.mark.asyncio
     async def test_run_with_plotting_enabled(self, mock_strategy, bot):
         bot.no_plot = False
+        bot.balance_tracker.setup_balances = AsyncMock()
+        bot._generate_and_log_performance = Mock()
         bot.strategy.plot_results = Mock()
         bot.strategy.run = AsyncMock()
         bot.order_status_tracker.start_tracking = Mock()

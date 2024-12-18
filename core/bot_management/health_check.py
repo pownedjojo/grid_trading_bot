@@ -62,11 +62,15 @@ class HealthCheck:
         Performs bot health and resource usage checks.
         """
         try:
+            self.logger.info("Starting health checks for bot and system resources.")
+
             bot_health = await self.bot.get_bot_health_status()
+            self.logger.info(f"Fetched bot health status: {bot_health}")
             await self._check_and_alert_bot_health(bot_health)
 
-            ressource_usage = self._check_ressource_usage()            
-            await self._check_and_alert_ressource_usage(ressource_usage)
+            resource_usage = self._check_resource_usage()        
+            self.logger.info(f"System resource usage: {resource_usage}")
+            await self._check_and_alert_resource_usage(resource_usage)
 
         except Exception as e:
             self.logger.error(f"Health check encountered an error: {e}")
@@ -83,13 +87,19 @@ class HealthCheck:
 
         if not health_status["strategy"]:
             alerts.append("Trading strategy has encountered issues.")
+            self.logger.warning("Trading strategy is not functioning properly.")
+
         if not health_status["exchange_status"] == "ok":
             alerts.append(f"Exchange status is not ok: {health_status['exchange_status']}")
+            self.logger.warning(f"Exchange status issue detected: {health_status['exchange_status']}")
 
         if alerts:
+            self.logger.info(f"Bot health alerts generated: {alerts}")
             await self._send_alert(" | ".join(alerts))
+        else:
+            self.logger.info("Bot health is within acceptable parameters.")
 
-    async def _check_and_alert_ressource_usage(self, usage: dict):
+    async def _check_and_alert_resource_usage(self, usage: dict):
         """
         Checks system resource usage and sends alerts if thresholds are exceeded.
 
@@ -105,9 +115,12 @@ class HealthCheck:
                 alerts.append(message)
 
         if alerts:
+            self.logger.info(f"Resource usage alerts generated: {alerts}")
             await self._send_alert(" | ".join(alerts))
+        else:
+            self.logger.info("System resource usage is within acceptable limits.")
 
-    def _check_ressource_usage(self) -> dict:
+    def _check_resource_usage(self) -> dict:
         """
         Collects system resource usage metrics.
 

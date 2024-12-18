@@ -57,7 +57,8 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
     
     async def get_order(
         self, 
-        order_id: str
+        order_id: str,
+        pair: str
     ) -> Optional[Order]:
         return Order(
             identifier=order_id,
@@ -72,6 +73,6 @@ class BacktestOrderExecutionStrategy(OrderExecutionStrategy):
             timestamp=0,
             datetime="111",
             last_trade_timestamp=1,
-            symbol="ETH/BTC",
+            symbol=pair,
             time_in_force="GTC"
         )

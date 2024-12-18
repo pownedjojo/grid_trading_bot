@@ -70,10 +70,11 @@ class LiveOrderExecutionStrategy(OrderExecutionStrategy):
 
     async def get_order(
         self, 
-        order_id: str
+        order_id: str,
+        pair: str
     ) -> Optional[Order]:
         try:
-            raw_order = await self.exchange_service.fetch_order(order_id)
+            raw_order = await self.exchange_service.fetch_order(order_id, pair)
             order_result = await self._parse_order_result(raw_order)
             return order_result
 

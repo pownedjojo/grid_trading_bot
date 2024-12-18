@@ -120,9 +120,9 @@ class LiveExchangeService(ExchangeInterface):
 
     async def place_order(
         self, 
-        pair: str, 
+        pair: str,
+        order_type: str,
         order_side: str, 
-        order_type: str, 
         amount: float, 
         price: Optional[float] = None
     ) -> Dict[str, Union[str, float]]:
@@ -141,10 +141,11 @@ class LiveExchangeService(ExchangeInterface):
 
     async def fetch_order(
         self, 
+        pair: str,
         order_id: str
     ) -> Dict[str, Union[str, float]]:
         try:
-            return await self.exchange.fetch_order(order_id)
+            return await self.exchange.fetch_order(order_id, pair)
 
         except ccxt.NetworkError as e:
             raise DataFetchError(f"Network issue occurred while fetching order status: {str(e)}")

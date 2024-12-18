@@ -92,9 +92,9 @@ class TestLiveExchangeService:
         mock_ccxt.binance.return_value = mock_exchange_instance
 
         service = LiveExchangeService(config_manager, is_paper_trading_activated=False)
-        await service.place_order("BTC/USD", "buy", "limit", 1, 50000.0)
+        await service.place_order("BTC/USD",  "limit", "buy", 1, 50000.0)
 
-        mock_exchange_instance.create_order.assert_called_once_with("BTC/USD", "limit", "buy", 1, 50000.0)
+        mock_exchange_instance.create_order.assert_called_once_with("BTC/USD",  "limit", "buy", 1, 50000.0)
 
     @patch("core.services.live_exchange_service.getattr")
     @pytest.mark.asyncio

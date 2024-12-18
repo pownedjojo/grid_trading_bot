@@ -26,6 +26,7 @@ class OrderExecutionStrategy(ABC):
     @abstractmethod
     async def get_order(
         self, 
-        order_id: str
+        order_id: str,
+        pair: str
     ) -> Optional[Order]:
         pass

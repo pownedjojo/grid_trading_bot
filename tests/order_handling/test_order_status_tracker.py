@@ -21,8 +21,8 @@ class TestOrderStatusTracker:
     @pytest.mark.asyncio
     async def test_process_open_orders_success(self, setup_tracker):
         tracker, order_book, order_execution_strategy, _ = setup_tracker
-        mock_order = Mock(identifier="order_1", status=OrderStatus.OPEN)
-        mock_remote_order = Mock(identifier="order_1", status=OrderStatus.CLOSED)
+        mock_order = Mock(identifier="order_1", symbol="BTC/USDT", status=OrderStatus.OPEN)
+        mock_remote_order = Mock(identifier="order_1", symbol="BTC/USDT", status=OrderStatus.CLOSED)
 
         order_book.get_open_orders.return_value = [mock_order]
         order_execution_strategy.get_order = AsyncMock(return_value=mock_remote_order)
@@ -30,13 +30,13 @@ class TestOrderStatusTracker:
 
         await tracker._process_open_orders()
 
-        order_execution_strategy.get_order.assert_awaited_once_with("order_1")
+        order_execution_strategy.get_order.assert_awaited_once_with("order_1", "BTC/USDT")
         tracker._handle_order_status_change.assert_called_once_with(mock_order, mock_remote_order)
 
     @pytest.mark.asyncio
     async def test_process_open_orders_failure(self, setup_tracker):
         tracker, order_book, order_execution_strategy, _ = setup_tracker
-        mock_order = Mock(identifier="order_1", status=OrderStatus.OPEN)
+        mock_order = Mock(identifier="order_1", symbol="BTC/USDT", status=OrderStatus.OPEN)
 
         order_book.get_open_orders.return_value = [mock_order]
         order_execution_strategy.get_order = AsyncMock(side_effect=Exception("Failed to fetch order"))
@@ -44,7 +44,7 @@ class TestOrderStatusTracker:
         with patch.object(tracker.logger, "error") as mock_logger_error:
             await tracker._process_open_orders()
 
-            order_execution_strategy.get_order.assert_awaited_once_with("order_1")
+            order_execution_strategy.get_order.assert_awaited_once_with("order_1", "BTC/USDT")
             mock_logger_error.assert_called_once_with("Failed to query status for order order_1: Failed to fetch order", exc_info=True)
 
     def test_handle_order_status_change_closed(self, setup_tracker):

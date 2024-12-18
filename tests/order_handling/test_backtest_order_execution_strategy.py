@@ -58,8 +58,9 @@ class TestBacktestOrderExecutionStrategy:
     async def test_get_order(self, setup_strategy):
         strategy = setup_strategy
         order_id = "test-order-1"
+        order_symbol = "BTC/USDT"
 
-        order = await strategy.get_order(order_id)
+        order = await strategy.get_order(order_id, order_symbol)
 
         assert order is not None
         assert order.identifier == order_id
@@ -71,6 +72,6 @@ class TestBacktestOrderExecutionStrategy:
         assert order.amount == 1
         assert order.filled == 1
         assert order.remaining == 0
-        assert order.symbol == "ETH/BTC"
+        assert order.symbol == order_symbol
         assert order.time_in_force == "GTC"
         assert order.timestamp == 0

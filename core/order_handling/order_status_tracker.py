@@ -60,7 +60,7 @@ class OrderStatusTracker:
         Query order and handling state changes if needed.
         """
         try:
-            order_status = await self.order_execution_strategy.get_order(order.identifier)
+            order_status = await self.order_execution_strategy.get_order(order.identifier, order.symbol)
             self._handle_order_status_change(order, order_status)
 
         except Exception as error:

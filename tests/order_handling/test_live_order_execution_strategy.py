@@ -98,6 +98,7 @@ class TestLiveOrderExecutionStrategy:
     async def test_get_order_success(self, setup_strategy):
         strategy, exchange_service = setup_strategy
         order_id = "test-order-id"
+        pair = "BTC/USDT"
         raw_order = {
             "id": order_id,
             "status": "open",
@@ -107,26 +108,28 @@ class TestLiveOrderExecutionStrategy:
             "amount": 1,
             "filled": 0,
             "remaining": 1,
-            "symbol": "BTC/USDT",
+            "symbol": pair,
         }
 
         exchange_service.fetch_order = AsyncMock(return_value=raw_order)
 
-        order = await strategy.get_order(order_id)
+        order = await strategy.get_order(order_id, pair)
 
         assert order is not None
         assert order.identifier == order_id
+        assert order.symbol == pair
         assert order.status == OrderStatus.OPEN
         assert order.order_type == OrderType.LIMIT
 
     async def test_get_order_data_fetch_error(self, setup_strategy):
         strategy, exchange_service = setup_strategy
         order_id = "test-order-id"
+        pair = "BTC/USDT"
 
         exchange_service.fetch_order = AsyncMock(side_effect=DataFetchError("Order not found"))
 
         with pytest.raises(DataFetchError):
-            await strategy.get_order(order_id)
+            await strategy.get_order(order_id, pair)
 
     async def test_handle_partial_fill(self, setup_strategy):
         strategy, exchange_service = setup_strategy

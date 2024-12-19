@@ -99,12 +99,12 @@ class GridTradingBot:
 
         except (UnsupportedExchangeError, DataFetchError, UnsupportedTimeframeError) as e:
             self.logger.error(f"{type(e).__name__}: {e}")
-            exit(1)   
+            raise
 
         except Exception as e:
             self.logger.error("An unexpected error occurred.")
             self.logger.error(traceback.format_exc())
-            exit(1)
+            raise
 
     async def run(self) -> Optional[Dict[str, Any]]:
         try:
@@ -128,7 +128,7 @@ class GridTradingBot:
         except Exception as e:
             self.logger.error(f"An unexpected error occurred {e}")
             self.logger.error(traceback.format_exc())
-            exit(1)
+            raise
         
         finally:
             self.is_running = False

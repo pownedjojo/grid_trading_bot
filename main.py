@@ -59,22 +59,23 @@ async def run_bot(
     
     except asyncio.CancelledError:
         logging.info("Cancellation received. Shutting down gracefully.")
-        raise
 
     except Exception as e:
         logging.error(f"An unexpected error occurred: {e}", exc_info=True)
     
     finally:
         if bot.trading_mode in {TradingMode.LIVE, TradingMode.PAPER_TRADING}:
-            await cleanup_tasks()
+            await cleanup_tasks(vent_bus)
 
-async def cleanup_tasks():
+async def cleanup_tasks(event_bus: EventBus):
     logging.info("Shutting down bot and cleaning up tasks...")
-    for task in asyncio.all_tasks():
-        if task is not asyncio.current_task():
-            task.cancel()
+    await event_bus.shutdown()
+    tasks = [task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
 
-    await asyncio.gather(*asyncio.all_tasks(), return_exceptions=True)
+    for task in tasks:
+        task.cancel()
+
+    await asyncio.gather(*tasks, return_exceptions=True)
     logging.info("All tasks have been cleaned up.")
 
 if __name__ == "__main__":

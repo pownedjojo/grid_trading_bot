@@ -53,9 +53,8 @@ class BotController:
             command: The command entered by the user.
         """
         if command == "quit":
-            self.logger.info("Stopping the bot...")
-            self._stop_listener()
-            self.event_bus.publish_sync(Events.STOP_BOT, "User requested shutdown")
+            self.logger.info("Stop bot command received")
+            await self.event_bus.publish(Events.STOP_BOT, "User requested shutdown")
         
         elif command == "orders":
             await self._display_orders()
@@ -64,11 +63,11 @@ class BotController:
             await self._display_balance()
 
         elif command == "stop":
-            await self.event_bus.publish(Events.STOP_BOT, "User issued stop command")
+            self.event_bus.publish_sync(Events.STOP_BOT, "User issued stop command")
 
         elif command == "restart":
-            await self.event_bus.publish(Events.STOP_BOT, "User issued restart command")
-            await self.event_bus.publish(Events.START_BOT, "User issued restart command")
+            self.event_bus.publish_sync(Events.STOP_BOT, "User issued restart command")
+            self.event_bus.publish_sync(Events.START_BOT, "User issued restart command")
         
         elif command.startswith("pause"):
             await self._pause_bot(command)
@@ -97,6 +96,7 @@ class BotController:
         """
         Displays formatted orders retrieved from the bot.
         """
+        self.logger.info("Display orders bot command received")
         formatted_orders = self.bot.strategy.get_formatted_orders()
         orders_table = tabulate(formatted_orders, headers=["Order Side", "Type", "Status", "Price", "Quantity", "Timestamp", "Grid Level", "Slippage"], tablefmt="pipe")
         self.logger.info("\nFormatted Orders:\n" + orders_table)
@@ -105,6 +105,7 @@ class BotController:
         """
         Displays the current balances retrieved from the bot.
         """
+        self.logger.info("Display balance bot command received")
         current_balances = self.bot.get_balances()
         self.logger.info(f"Current balances: {current_balances}")
 
@@ -116,6 +117,7 @@ class BotController:
             command: The pause command containing the duration.
         """
         try:
+            self.logger.info("Pause bot command received")
             duration = int(command.split()[1])
             await self.event_bus.publish(Events.STOP_BOT, "User issued pause command")
             self.logger.info(f"Bot paused for {duration} seconds.")

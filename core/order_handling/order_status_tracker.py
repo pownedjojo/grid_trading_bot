@@ -30,6 +30,7 @@ class OrderStatusTracker:
         self.event_bus = event_bus
         self.polling_interval = polling_interval
         self._monitoring_task = None
+        self._active_tasks = set()
         self.logger = logging.getLogger(self.__class__.__name__)
 
     async def _track_open_order_statuses(self) -> None:
@@ -43,6 +44,7 @@ class OrderStatusTracker:
 
         except asyncio.CancelledError:
             self.logger.info("OrderStatusTracker monitoring task was cancelled.")
+            await self._cancel_active_tasks()
 
         except Exception as error:
             self.logger.error(f"Unexpected error in OrderStatusTracker: {error}")
@@ -52,8 +54,11 @@ class OrderStatusTracker:
         Processes open orders by querying their statuses and handling state changes.
         """
         open_orders = self.order_book.get_open_orders()
-        tasks = [self._query_and_handle_order(order) for order in open_orders]
-        await asyncio.gather(*tasks)
+        tasks = [self._create_task(self._query_and_handle_order(order)) for order in open_orders]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                self.logger.error(f"Error during order processing: {result}", exc_info=True)
 
     async def _query_and_handle_order(self, order):
         """
@@ -109,6 +114,27 @@ class OrderStatusTracker:
         except Exception as e:
             self.logger.error(f"Error handling order status change: {e}", exc_info=True)
 
+    def _create_task(self, coro):
+        """
+        Creates a managed asyncio task and adds it to the active task set.
+
+        Args:
+            coro: Coroutine to be scheduled as a task.
+        """
+        task = asyncio.create_task(coro)
+        self._active_tasks.add(task)
+        task.add_done_callback(self._active_tasks.discard)
+        return task
+
+    async def _cancel_active_tasks(self):
+        """
+        Cancels all active tasks tracked by the tracker.
+        """
+        for task in self._active_tasks:
+            task.cancel()
+        await asyncio.gather(*self._active_tasks, return_exceptions=True)
+        self._active_tasks.clear()
+
     def start_tracking(self) -> None:
         """
         Starts the order tracking task.
@@ -129,5 +155,6 @@ class OrderStatusTracker:
                 await self._monitoring_task
             except asyncio.CancelledError:
                 self.logger.info("OrderStatusTracker monitoring task was cancelled.")
+            await self._cancel_active_tasks()
             self._monitoring_task = None
             self.logger.info("OrderStatusTracker has stopped tracking open orders.")

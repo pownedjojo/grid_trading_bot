@@ -196,6 +196,7 @@ class GridTradingStrategy(TradingStrategy):
             )
         else:
             self.logger.info("Performance report is not available for live/paper trading mode.")
+            return {}, []
 
     def plot_results(self) -> None:
         if self.trading_mode == TradingMode.BACKTEST:
